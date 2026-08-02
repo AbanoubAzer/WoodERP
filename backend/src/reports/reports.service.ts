@@ -1,0 +1,457 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+
+@Injectable()
+export class ReportsService {
+  constructor(private prisma: PrismaService) {}
+
+  async getDashboardData(companyId: string, locationId?: string, locationType?: string) {
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+
+    let salesWhere: any = { companyId, issuedAt: { gte: startOfMonth } };
+    let purchasesWhere: any = { companyId, issuedAt: { gte: startOfMonth } };
+    let treasuryWhere: any = { companyId };
+    let inventoryWhere: any = { companyId };
+    let customerWhere: any = { companyId };
+    let supplierWhere: any = { companyId };
+    let expenseWhere: any = { companyId, date: { gte: startOfMonth } };
+
+    if (locationId) {
+      if (locationType === 'BRANCH') {
+        salesWhere.warehouse = { branchId: locationId };
+        purchasesWhere.warehouse = { branchId: locationId };
+        treasuryWhere.branchId = locationId;
+        inventoryWhere.warehouse = { branchId: locationId };
+        customerWhere = { companyId, warehouse: { branchId: locationId } };
+        supplierWhere = { companyId, warehouse: { branchId: locationId } };
+      } else if (locationType === 'WAREHOUSE') {
+        salesWhere.warehouseId = locationId;
+        purchasesWhere.warehouseId = locationId;
+        // Treasury accounts are linked to branches, not warehouses
+        inventoryWhere.warehouseId = locationId;
+        customerWhere = { companyId, warehouseId: locationId };
+        supplierWhere = { companyId, warehouseId: locationId };
+      }
+    }
+
+    // Sales
+    const salesAgg = await this.prisma.salesInvoice.aggregate({
+      where: salesWhere,
+      _sum: { totalAmount: true }
+    });
+
+    // Purchases
+    const purchasesAgg = await this.prisma.purchaseInvoice.aggregate({
+      where: purchasesWhere,
+      _sum: { totalAmount: true }
+    });
+
+    // Expenses
+    const expensesAgg = await this.prisma.expense.aggregate({
+      where: expenseWhere,
+      _sum: { amount: true }
+    });
+
+    // Receivables (Debits - Credits)
+    const customerDebits = await this.prisma.customerTransaction.aggregate({
+      where: { customer: customerWhere, type: 'DEBIT' },
+      _sum: { amount: true }
+    });
+    const customerCredits = await this.prisma.customerTransaction.aggregate({
+      where: { customer: customerWhere, type: 'CREDIT' },
+      _sum: { amount: true }
+    });
+    const receivables = (customerDebits._sum.amount || 0) - (customerCredits._sum.amount || 0);
+
+    // Payables (Purchases - Payments)
+    const supplierPurchases = await this.prisma.supplierTransaction.aggregate({
+      where: { supplier: supplierWhere, type: 'PURCHASE' },
+      _sum: { amount: true }
+    });
+    const supplierPayments = await this.prisma.supplierTransaction.aggregate({
+      where: { supplier: supplierWhere, type: { in: ['PAYMENT', 'RETURN'] } },
+      _sum: { amount: true }
+    });
+    const payables = (supplierPurchases._sum.amount || 0) - (supplierPayments._sum.amount || 0);
+
+    // Cash Position
+    const treasury = await this.prisma.treasuryAccount.aggregate({
+      where: treasuryWhere,
+      _sum: { balance: true }
+    });
+
+    // Inventory Total
+    const inventory = await this.prisma.inventoryStock.aggregate({
+      where: inventoryWhere,
+      _sum: { physicalQty: true }
+    });
+
+    // Sales Trend (Last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const recentInvoices = await this.prisma.salesInvoice.findMany({
+      where: { ...salesWhere, issuedAt: { gte: thirtyDaysAgo } },
+      select: { issuedAt: true, totalAmount: true },
+      orderBy: { issuedAt: 'asc' }
+    });
+
+    const salesTrend = recentInvoices.reduce((acc, inv) => {
+      const d = inv.issuedAt.toISOString().split('T')[0];
+      acc[d] = (acc[d] || 0) + inv.totalAmount;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const trendData = Object.keys(salesTrend).map(date => ({
+      date,
+      sales: salesTrend[date]
+    }));
+
+    // Recent Activity (Customer Transactions)
+    const recentActivity = await this.prisma.customerTransaction.findMany({
+      where: { customer: customerWhere },
+      include: { customer: true },
+      orderBy: { date: 'desc' },
+      take: 5
+    });
+
+    const today = new Date();
+    const overdueInstallments = await this.prisma.installment.findMany({
+      where: {
+        status: 'PENDING',
+        dueDate: { lt: today },
+        plan: {
+           companyId,
+           OR: [
+             { customer: customerWhere },
+             { supplier: supplierWhere }
+           ]
+        }
+      },
+      include: {
+        plan: {
+          include: {
+            customer: true,
+            supplier: true
+          }
+        }
+      },
+      orderBy: { dueDate: 'asc' },
+      take: 10
+    });
+
+    // Stagnant Inventory
+    const stagnantDate = new Date();
+    stagnantDate.setDate(stagnantDate.getDate() - 60);
+    const stagnantInventory = await this.prisma.inventoryStock.findMany({
+      where: { ...inventoryWhere, lastUpdated: { lt: stagnantDate }, physicalQty: { gt: 0 } },
+      include: { variant: { include: { product: true } } },
+      orderBy: { lastUpdated: 'asc' },
+      take: 5
+    });
+
+    // Upcoming Installments (Customer)
+    const upcomingInstallments = await this.prisma.installment.findMany({
+      where: { 
+        plan: { customer: customerWhere }, 
+        status: { not: 'PAID' }
+      },
+      include: { plan: { include: { customer: true } } },
+      orderBy: { dueDate: 'asc' },
+      take: 5
+    });
+
+    // Upcoming Installments (Supplier)
+    const supplierInstallments = await this.prisma.installment.findMany({
+      where: { 
+        plan: { supplier: supplierWhere }, 
+        status: { not: 'PAID' }
+      },
+      include: { plan: { include: { supplier: true } } },
+      orderBy: { dueDate: 'asc' },
+      take: 5
+    });
+
+    // Recent Transfers
+    let transferWhere: any = { companyId, type: 'TRANSFER' };
+    if (locationId) {
+      if (locationType === 'BRANCH') {
+        transferWhere.OR = [
+          { fromWarehouse: { branchId: locationId } },
+          { toWarehouse: { branchId: locationId } }
+        ];
+      } else if (locationType === 'WAREHOUSE') {
+        transferWhere.OR = [
+          { fromWarehouseId: locationId },
+          { toWarehouseId: locationId }
+        ];
+      }
+    }
+    const recentTransfers = await this.prisma.stockMovement.findMany({
+      where: transferWhere,
+      include: {
+        fromWarehouse: true,
+        toWarehouse: true,
+        variant: { include: { product: true } },
+        user: true
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 5
+    });
+
+    return {
+      salesTotal: salesAgg._sum.totalAmount || 0,
+      purchasesTotal: purchasesAgg._sum.totalAmount || 0,
+      expensesTotal: expensesAgg._sum.amount || 0,
+      receivables,
+      payables,
+      cashPosition: treasury._sum.balance || 0,
+      inventoryTotal: inventory._sum.physicalQty || 0,
+      salesTrend: trendData,
+      recentActivity,
+      overdueInstallments,
+      stagnantInventory,
+      upcomingInstallments,
+      supplierInstallments,
+      recentTransfers
+    };
+  }
+
+  async getArAgingReport(companyId: string) {
+    // Get all pending and partial customer installments
+    const installments = await this.prisma.installment.findMany({
+      where: {
+        plan: { companyId, customerId: { not: null } },
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] }
+      },
+      include: { plan: { include: { customer: true } } }
+    });
+
+    const report = {
+      '0-30': 0,
+      '31-60': 0,
+      '61-90': 0,
+      '90+': 0,
+      totalOverdue: 0,
+      customers: {} as Record<string, any>
+    };
+
+    const now = new Date();
+    
+    installments.forEach(inst => {
+      const remaining = inst.amount - inst.paidAmount;
+      if (remaining <= 0) return;
+      
+      const customer = inst.plan.customer!;
+      if (!report.customers[customer.id]) {
+        report.customers[customer.id] = {
+          name: customer.name,
+          phone: customer.phone,
+          '0-30': 0,
+          '31-60': 0,
+          '61-90': 0,
+          '90+': 0,
+          total: 0
+        };
+      }
+
+      if (inst.dueDate < now) {
+        report.totalOverdue += remaining;
+        report.customers[customer.id].total += remaining;
+
+        const diffTime = Math.abs(now.getTime() - inst.dueDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 30) {
+          report['0-30'] += remaining;
+          report.customers[customer.id]['0-30'] += remaining;
+        } else if (diffDays <= 60) {
+          report['31-60'] += remaining;
+          report.customers[customer.id]['31-60'] += remaining;
+        } else if (diffDays <= 90) {
+          report['61-90'] += remaining;
+          report.customers[customer.id]['61-90'] += remaining;
+        } else {
+          report['90+'] += remaining;
+          report.customers[customer.id]['90+'] += remaining;
+        }
+      }
+    });
+
+    return {
+      summary: {
+        '0-30': report['0-30'],
+        '31-60': report['31-60'],
+        '61-90': report['61-90'],
+        '90+': report['90+'],
+        totalOverdue: report.totalOverdue
+      },
+      customers: Object.values(report.customers)
+    };
+  }
+
+  async getApAgingReport(companyId: string) {
+    const installments = await this.prisma.installment.findMany({
+      where: {
+        plan: { companyId, supplierId: { not: null } },
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] }
+      },
+      include: { plan: { include: { supplier: true } } }
+    });
+
+    const report = {
+      '0-30': 0,
+      '31-60': 0,
+      '61-90': 0,
+      '90+': 0,
+      totalOverdue: 0,
+      suppliers: {} as Record<string, any>
+    };
+
+    const now = new Date();
+    
+    installments.forEach(inst => {
+      const remaining = inst.amount - inst.paidAmount;
+      if (remaining <= 0) return;
+      
+      const supplier = inst.plan.supplier!;
+      if (!report.suppliers[supplier.id]) {
+        report.suppliers[supplier.id] = {
+          name: supplier.name,
+          phone: supplier.phone,
+          '0-30': 0,
+          '31-60': 0,
+          '61-90': 0,
+          '90+': 0,
+          total: 0
+        };
+      }
+
+      if (inst.dueDate < now) {
+        report.totalOverdue += remaining;
+        report.suppliers[supplier.id].total += remaining;
+
+        const diffTime = Math.abs(now.getTime() - inst.dueDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays <= 30) {
+          report['0-30'] += remaining;
+          report.suppliers[supplier.id]['0-30'] += remaining;
+        } else if (diffDays <= 60) {
+          report['31-60'] += remaining;
+          report.suppliers[supplier.id]['31-60'] += remaining;
+        } else if (diffDays <= 90) {
+          report['61-90'] += remaining;
+          report.suppliers[supplier.id]['61-90'] += remaining;
+        } else {
+          report['90+'] += remaining;
+          report.suppliers[supplier.id]['90+'] += remaining;
+        }
+      }
+    });
+
+    return {
+      summary: {
+        '0-30': report['0-30'],
+        '31-60': report['31-60'],
+        '61-90': report['61-90'],
+        '90+': report['90+'],
+        totalOverdue: report.totalOverdue
+      },
+      suppliers: Object.values(report.suppliers)
+    };
+  }
+
+  async getSalesReports(companyId: string) {
+    const invoices = await this.prisma.salesInvoice.findMany({
+      where: { companyId },
+      include: { customer: true },
+      orderBy: { issuedAt: 'desc' },
+      take: 50
+    });
+    return { data: invoices };
+  }
+
+  async getInventoryReports(companyId: string) {
+    const stock = await this.prisma.inventoryStock.findMany({
+      where: { companyId },
+      include: { variant: { include: { product: true } }, warehouse: true }
+    });
+    return { data: stock };
+  }
+
+  async getCustomerReports(companyId: string) {
+    const customers = await this.prisma.customer.findMany({
+      where: { companyId },
+      include: { transactions: { orderBy: { date: 'desc' }, take: 5 } }
+    });
+    return { data: customers };
+  }
+
+  async getSupplierReports(companyId: string) {
+    const suppliers = await this.prisma.supplier.findMany({
+      where: { companyId },
+      include: { transactions: { orderBy: { date: 'desc' }, take: 5 } }
+    });
+    return { data: suppliers };
+  }
+
+  async getCustomerStatement(companyId: string, customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId, companyId },
+    });
+    
+    if (!customer) throw new Error('Customer not found');
+
+    const transactions = await this.prisma.customerTransaction.findMany({
+      where: { customerId },
+      orderBy: { date: 'asc' }
+    });
+
+    const invoiceIds = transactions.filter(t => t.type === 'DEBIT' && t.referenceId).map(t => t.referenceId);
+    
+    const invoices = await this.prisma.salesInvoice.findMany({
+      where: { id: { in: invoiceIds as string[] } },
+      include: {
+        items: {
+          include: { variant: { include: { product: true } } }
+        }
+      }
+    });
+
+    const invoiceMap = new Map(invoices.map(inv => [inv.id, inv]));
+
+    const statementLines = transactions.map(t => {
+      if (t.type === 'DEBIT' && t.referenceId) {
+        const inv = invoiceMap.get(t.referenceId);
+        if (inv) {
+           return {
+             id: t.id,
+             date: t.date,
+             description: `فاتورة مبيعات ${inv.invoiceNumber}`,
+             items: inv.items.map(item => ({
+               productName: item.variant.product.name,
+               quantity: item.quantity,
+               price: item.unitPrice,
+               subtotal: item.subtotal
+             })),
+             value: t.amount,
+             payment: 0,
+             balance: t.runningBalance
+           };
+        }
+      }
+      return {
+        id: t.id,
+        date: t.date,
+        description: t.reason || (t.type === 'CREDIT' ? 'ايداع بنك/نقدي' : 'معاملة'),
+        items: [],
+        value: t.type === 'DEBIT' ? t.amount : 0,
+        payment: t.type === 'CREDIT' ? t.amount : 0,
+        balance: t.runningBalance
+      };
+    });
+
+    return { customer, statement: statementLines };
+  }
+}
+

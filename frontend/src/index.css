@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Cairo', sans-serif;
+  
+  --color-brand-sidebar: #131b2f;
+  --color-brand-primary: #f28913;
+  --color-brand-primary-hover: #d97a0e;
+  --color-brand-success: #10b981;
+  --color-brand-danger: #ef4444;
+  --color-brand-bg: #f8fafc;
+}
+
+@layer base {
+  body {
+    @apply font-sans bg-[var(--color-brand-bg)] text-slate-800 antialiased;
+  }
+}

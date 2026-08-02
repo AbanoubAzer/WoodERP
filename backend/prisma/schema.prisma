@@ -1,0 +1,780 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 0: Identity, Multi-Tenancy & Multi-Branch Management
+// -----------------------------------------------------------------------------
+
+model Company {
+  id                     String        @id @default(uuid())
+  code                   String        @unique // Unique tenant identifier
+  name                   String
+  taxNumber              String?
+  commercialRegistration String?
+  phone                  String?
+  email                  String?       @unique
+  address                String?
+  logoUrl                String?
+  status                 CompanyStatus @default(ACTIVE)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  settings         CompanySetting?
+  branches         Branch[]
+  users            User[]
+  roles            Role[]
+  auditLogs        AuditLog[]
+  categories       Category[]
+  woodTypes        WoodType[]
+  products         Product[]
+  warehouses       Warehouse[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  salesInvoices    SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+  installmentPlans InstallmentPlan[]
+  accounts         Account[]
+  journalEntries   JournalEntry[]
+  expenses         Expense[]
+  treasuryAccounts TreasuryAccount[]
+  notifications    Notification[]
+  customReports    CustomReport[]
+  reportSchedules  ReportSchedule[]
+}
+
+enum CompanyStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model CompanySetting {
+  id                 String  @id @default(uuid())
+  companyId          String  @unique
+  currency           String  @default("EGP")
+  decimalPrecision   Int     @default(2)
+  language           String  @default("ar")
+  timeZone           String  @default("Africa/Cairo")
+  dateFormat         String  @default("YYYY-MM-DD")
+  invoiceNumbering   String  @default("INV-{YYYY}-{0000}")
+  fiscalYear         String  @default("JAN-DEC")
+  vatPercent         Float   @default(14.0)
+  defaultWarehouseId String?
+  defaultBranchId    String?
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model Branch {
+  id        String       @id @default(uuid())
+  companyId String
+  name      String
+  type      BranchType   @default(WAREHOUSE)
+  address   String?
+  phone     String?
+  managerId String?
+  status    BranchStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  company          Company           @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  manager          User?             @relation("BranchManager", fields: [managerId], references: [id])
+  users            User[]            @relation("UserBranches") // Implicit many-to-many
+  warehouses       Warehouse[]
+  treasuryAccounts TreasuryAccount[]
+}
+
+enum BranchType {
+  SHOWROOM
+  WAREHOUSE
+  DISTRIBUTION_CENTER
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Role {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  permissions String[] // Array of permission strings e.g. ["CREATE_INVOICE", "VIEW_REPORTS"]
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users   User[]
+}
+
+model User {
+  id           String     @id @default(uuid())
+  companyId    String
+  email        String // Must be unique per company (we can enforce this in code or composite unique)
+  passwordHash String
+  name         String
+  phone        String?
+  jobTitle     String?
+  status       UserStatus @default(ACTIVE)
+  isOwner      Boolean    @default(false)
+  isSuperAdmin Boolean    @default(false)
+  roleId       String?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role              Role?                 @relation(fields: [roleId], references: [id])
+  branches          Branch[]              @relation("UserBranches")
+  auditLogs         AuditLog[]
+  priceChanges      ProductPriceHistory[]
+  managedWarehouses Warehouse[]           @relation("WarehouseManager")
+  managedBranches   Branch[]              @relation("BranchManager")
+  stockMovements    StockMovement[]       @relation("MovementUser")
+  notifications     Notification[]
+  customReports     CustomReport[]
+  createdSalesInvoices    SalesInvoice[]    @relation("SalesCreator")
+  createdPurchaseInvoices PurchaseInvoice[] @relation("PurchaseCreator")
+
+  @@unique([companyId, email]) // Enforce unique email per tenant
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  userId    String?
+  action    String // e.g. "LOGIN", "CREATE_INVOICE"
+  entity    String? // e.g. "Invoice", "User"
+  metadata  Json? // Store IP, browser, or changed fields
+  timestamp DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 1: Product Master & Wood Catalog Management
+// -----------------------------------------------------------------------------
+
+model Category {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  parentId    String?
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  parent   Category?  @relation("CategoryToCategory", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryToCategory")
+  products Product[]
+
+  @@unique([companyId, name])
+}
+
+model WoodType {
+  id            String   @id @default(uuid())
+  companyId     String
+  name          String // e.g. "American Oak"
+  species       String?
+  originCountry String?
+  grade         String?
+  color         String?
+  description   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  company  Company   @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  products Product[]
+
+  @@unique([companyId, name])
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  companyId   String
+  categoryId  String
+  woodTypeId  String?
+  name        String
+  description String?
+  brand       String?
+  baseUnit    String   @default("PIECE") // PIECE, METER, SQM, CUBIC_METER, SHEET, BUNDLE
+  status      String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  company  Company          @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  category Category         @relation(fields: [categoryId], references: [id])
+  woodType WoodType?        @relation(fields: [woodTypeId], references: [id])
+  variants ProductVariant[]
+}
+
+model ProductVariant {
+  id        String  @id @default(uuid())
+  productId String
+  sku       String  @unique
+  barcode   String? @unique
+
+  // Specifications
+  thickness Float?
+  width     Float?
+  length    Float?
+  volume    Float? // length * width * thickness
+  weight    Float?
+  grade     String?
+
+  // Pricing
+  purchasePrice   Float  @default(0)
+  retailPrice     Float  @default(0)
+  wholesalePrice  Float  @default(0)
+  minSellingPrice Float?
+
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  product        Product               @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceHistory   ProductPriceHistory[]
+  inventory      InventoryStock[]
+  stockMovements StockMovement[]
+  salesItems     SalesInvoiceItem[]
+  purchaseItems  PurchaseInvoiceItem[]
+}
+
+model ProductPriceHistory {
+  id          String   @id @default(uuid())
+  variantId   String
+  priceType   String // RETAIL, WHOLESALE, PURCHASE
+  oldPrice    Float
+  newPrice    Float
+  changedById String?
+  timestamp   DateTime @default(now())
+
+  variant   ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  changedBy User?          @relation(fields: [changedById], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 2: Inventory Management & Warehouse Operations
+// -----------------------------------------------------------------------------
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  companyId String
+  branchId  String
+  managerId String?
+  name      String
+  address   String?
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch        Branch                @relation(fields: [branchId], references: [id])
+  manager       User?                 @relation("WarehouseManager", fields: [managerId], references: [id])
+  locations     StorageLocation[]
+  stock         InventoryStock[]
+  movementsFrom StockMovement[]       @relation("MovementFromWarehouse")
+  movementsTo   StockMovement[]       @relation("MovementToWarehouse")
+  salesItems    SalesInvoiceItem[]
+  purchaseItems PurchaseInvoiceItem[]
+  customers     Customer[]
+  suppliers     Supplier[]
+  salesInvoices SalesInvoice[]
+  purchaseInvoices PurchaseInvoice[]
+}
+
+model StorageLocation {
+  id          String  @id @default(uuid())
+  warehouseId String
+  zone        String?
+  rack        String?
+  section     String?
+  bin         String?
+  status      String  @default("ACTIVE")
+
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  stock     InventoryStock[]
+}
+
+model InventoryStock {
+  id          String   @id @default(uuid())
+  companyId   String
+  warehouseId String
+  locationId  String?
+  variantId   String
+  physicalQty Float    @default(0)
+  reservedQty Float    @default(0)
+  lastUpdated DateTime @default(now()) @updatedAt
+
+  warehouse Warehouse        @relation(fields: [warehouseId], references: [id])
+  location  StorageLocation? @relation(fields: [locationId], references: [id])
+  variant   ProductVariant   @relation(fields: [variantId], references: [id])
+
+  @@unique([warehouseId, locationId, variantId]) // One unique record per item per location
+}
+
+model StockMovement {
+  id              String   @id @default(uuid())
+  companyId       String
+  type            String // RECEIVE, ISSUE, TRANSFER, ADJUST
+  referenceId     String? // Could link to PurchaseOrder or SalesOrder later
+  variantId       String
+  quantity        Float
+  fromWarehouseId String?
+  toWarehouseId   String?
+  reason          String?
+  userId          String?
+  createdAt       DateTime @default(now())
+
+  variant       ProductVariant @relation(fields: [variantId], references: [id])
+  fromWarehouse Warehouse?     @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
+  toWarehouse   Warehouse?     @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
+  user          User?          @relation("MovementUser", fields: [userId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 3: Customer Management & CRM
+// -----------------------------------------------------------------------------
+
+model Customer {
+  id          String  @id @default(uuid())
+  companyId   String
+  warehouseId String?
+  code        String
+  name      String
+  phone     String?
+  email     String?
+  address   String?
+  city      String?
+  country   String?
+  notes     String? @db.Text
+
+  // Business Info
+  companyName   String?
+  taxNumber     String?
+  commercialReg String?
+  category      String  @default("RETAIL") // RETAIL, CONTRACTOR, DEALER, FACTORY
+
+  // Financial Info
+  creditLimit  Float  @default(0)
+  paymentTerms String @default("CASH") // CASH, 30_DAYS, 60_DAYS
+  status       String @default("ACTIVE") // ACTIVE, INACTIVE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse        Warehouse?            @relation(fields: [warehouseId], references: [id])
+  transactions     CustomerTransaction[]
+  payments         CustomerPayment[]
+  salesInvoices    SalesInvoice[]
+  installmentPlans InstallmentPlan[]
+
+  @@unique([companyId, code])
+}
+
+model CustomerTransaction {
+  id             String   @id @default(uuid())
+  customerId     String
+  type           String // DEBIT (increases debt), CREDIT (decreases debt)
+  amount         Float
+  runningBalance Float // Snapshot of balance after this transaction
+  referenceId    String? // Invoice ID, Receipt ID
+  reason         String? // "Opening Balance", "Sales Invoice #123"
+  date           DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+model CustomerPayment {
+  id          String   @id @default(uuid())
+  customerId  String
+  amount      Float
+  method      String // CASH, BANK_TRANSFER, CHEQUE
+  referenceId String? // Bank receipt number, Cheque number
+  date        DateTime @default(now())
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 4: Supplier Management & Vendor Relations
+// -----------------------------------------------------------------------------
+
+model Supplier {
+  id            String  @id @default(uuid())
+  companyId     String
+  warehouseId   String?
+  code          String
+  name          String
+  phone         String?
+  email         String?
+  address       String?
+  country       String?
+  contactPerson String?
+
+  // Business Info
+  companyName   String?
+  taxNumber     String?
+  commercialReg String?
+  bankDetails   String?
+  category      String  @default("LOCAL") // LOCAL, IMPORTED, MDF, ACCESSORIES
+
+  // Financial Info
+  paymentTerms String @default("CASH") // CASH, 30_DAYS, 60_DAYS
+  status       String @default("ACTIVE") // ACTIVE, INACTIVE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse        Warehouse?            @relation(fields: [warehouseId], references: [id])
+  transactions     SupplierTransaction[]
+  payments         SupplierPayment[]
+  purchaseInvoices PurchaseInvoice[]
+  installmentPlans InstallmentPlan[]
+
+  @@unique([companyId, code])
+}
+
+model SupplierTransaction {
+  id             String   @id @default(uuid())
+  supplierId     String
+  type           String // PURCHASE (increases debt), PAYMENT/RETURN (decreases debt)
+  amount         Float
+  runningBalance Float // Snapshot of balance after this transaction
+  referenceId    String? // Invoice ID, Receipt ID
+  reason         String? // "Opening Balance", "Purchase Invoice #123"
+  date           DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+model SupplierPayment {
+  id          String   @id @default(uuid())
+  supplierId  String
+  amount      Float
+  method      String // CASH, BANK_TRANSFER, CHEQUE
+  referenceId String? // Bank receipt number, Cheque number
+  date        DateTime @default(now())
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 5: Sales Management & Order Processing
+// -----------------------------------------------------------------------------
+
+model SalesInvoice {
+  id            String @id @default(uuid())
+  companyId     String
+  warehouseId   String?
+  customerId    String
+  invoiceNumber String // e.g. INV-2026-08-0001
+  status        String @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+
+  subtotal    Float @default(0)
+  discount    Float @default(0)
+  taxAmount   Float @default(0)
+  totalAmount Float @default(0)
+  amountPaid  Float @default(0)
+
+  notes       String?
+  issuedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse Warehouse?         @relation(fields: [warehouseId], references: [id])
+  customer  Customer           @relation(fields: [customerId], references: [id])
+  createdBy User?              @relation("SalesCreator", fields: [createdById], references: [id])
+  items     SalesInvoiceItem[]
+
+  @@unique([companyId, invoiceNumber])
+}
+
+model SalesInvoiceItem {
+  id          String @id @default(uuid())
+  invoiceId   String
+  variantId   String
+  warehouseId String
+  quantity    Float
+  unitPrice   Float
+  subtotal    Float
+
+  invoice   SalesInvoice   @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+  warehouse Warehouse      @relation(fields: [warehouseId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 6: Purchasing Management & Procurement
+// -----------------------------------------------------------------------------
+
+model PurchaseInvoice {
+  id            String @id @default(uuid())
+  companyId     String
+  warehouseId   String?
+  supplierId    String
+  invoiceNumber String // The system generated or manually entered supplier invoice number
+  status        String @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+
+  subtotal    Float @default(0)
+  discount    Float @default(0)
+  taxAmount   Float @default(0)
+  totalAmount Float @default(0)
+  amountPaid  Float @default(0)
+
+  notes       String?
+  issuedAt    DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse Warehouse?            @relation(fields: [warehouseId], references: [id])
+  supplier  Supplier              @relation(fields: [supplierId], references: [id])
+  createdBy User?                 @relation("PurchaseCreator", fields: [createdById], references: [id])
+  items     PurchaseInvoiceItem[]
+
+  @@unique([companyId, invoiceNumber])
+}
+
+model PurchaseInvoiceItem {
+  id          String @id @default(uuid())
+  invoiceId   String
+  variantId   String
+  warehouseId String
+  quantity    Float
+  unitCost    Float
+  subtotal    Float
+
+  invoice   PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  variant   ProductVariant  @relation(fields: [variantId], references: [id])
+  warehouse Warehouse       @relation(fields: [warehouseId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 7: Installments & Debt Management
+// -----------------------------------------------------------------------------
+
+model InstallmentPlan {
+  id         String @id @default(uuid())
+  companyId  String
+  customerId String?
+  supplierId String?
+
+  totalAmount    Float
+  numberOfMonths Int
+  startDate      DateTime @default(now())
+
+  referenceInvoiceId String? // Optional link to the Sales/Purchase Invoice that generated this plan
+  notes              String? @db.Text // Follow-up notes
+
+  status String @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company      Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  customer     Customer?     @relation(fields: [customerId], references: [id])
+  supplier     Supplier?     @relation(fields: [supplierId], references: [id])
+  installments Installment[]
+}
+
+model Installment {
+  id     String @id @default(uuid())
+  planId String
+
+  installmentNumber Int
+  dueDate           DateTime
+  amount            Float
+  paidAmount        Float    @default(0)
+  status            String   @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  plan InstallmentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 8: Accounting, Finance & General Ledger
+// -----------------------------------------------------------------------------
+
+model Account {
+  id        String @id @default(uuid())
+  companyId String
+
+  code String
+  name String
+  type String // ASSET, LIABILITY, EQUITY, REVENUE, EXPENSE
+
+  parentId String?
+  parent   Account?  @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children Account[] @relation("AccountHierarchy")
+
+  lines    JournalEntryLine[]
+  expenses Expense[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, code])
+}
+
+model JournalEntry {
+  id        String @id @default(uuid())
+  companyId String
+
+  date        DateTime @default(now())
+  description String
+  referenceId String? // ID of SalesInvoice, PurchaseInvoice, etc.
+
+  lines JournalEntryLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+model JournalEntryLine {
+  id        String @id @default(uuid())
+  entryId   String
+  accountId String
+
+  debit       Float   @default(0)
+  credit      Float   @default(0)
+  description String?
+
+  entry   JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  account Account      @relation(fields: [accountId], references: [id])
+}
+
+model Expense {
+  id        String @id @default(uuid())
+  companyId String
+  accountId String // The Expense Account in GL
+
+  amount          Float
+  date            DateTime @default(now())
+  description     String
+  referenceNumber String? // Receipt number
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  account Account @relation(fields: [accountId], references: [id])
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 9: Treasury, Cashier & Payment Management
+// -----------------------------------------------------------------------------
+
+model TreasuryAccount {
+  id        String  @id @default(uuid())
+  companyId String
+  branchId  String? // Nullable if it's a global bank account
+
+  name    String
+  type    String // CASH, BANK
+  balance Float  @default(0)
+
+  // Link to General Ledger (Account)
+  glAccountId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch  Branch? @relation(fields: [branchId], references: [id])
+
+  transactions TreasuryTransaction[]
+}
+
+model TreasuryTransaction {
+  id        String @id @default(uuid())
+  accountId String
+
+  type        String // IN, OUT, TRANSFER
+  amount      Float
+  referenceId String? // Payment ID, Expense ID, Transfer ID
+  description String?
+
+  date      DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  account TreasuryAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 11: Notifications & Alerts
+// -----------------------------------------------------------------------------
+
+model Notification {
+  id        String @id @default(uuid())
+  companyId String
+  userId    String // The recipient of the notification
+
+  title           String
+  message         String
+  type            String  @default("INFO") // INFO, WARNING, ALERT, SUCCESS
+  isRead          Boolean @default(false)
+  relatedEntityId String? // Optional ID for clicking through (e.g., invoice ID)
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC 10: Reporting, Analytics & Business Intelligence
+// -----------------------------------------------------------------------------
+
+model CustomReport {
+  id          String  @id @default(uuid())
+  companyId   String
+  name        String
+  description String?
+  module      String // e.g. SALES, INVENTORY, FINANCIAL
+  config      Json // Stores selected fields, filters, charts
+  createdById String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  createdBy User    @relation(fields: [createdById], references: [id])
+}
+
+model ReportSchedule {
+  id         String   @id @default(uuid())
+  companyId  String
+  reportName String // System report name or CustomReport ID
+  frequency  String // DAILY, WEEKLY, MONTHLY
+  format     String // PDF, EXCEL
+  recipients String[] // Array of emails or user IDs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
