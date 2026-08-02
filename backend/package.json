@@ -20,7 +20,7 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed:test-data": "ts-node prisma/seed-test-data.ts"
+    "seed:test-data": "ts-node -r dotenv/config prisma/seed-egypt.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -89,6 +89,6 @@
     "testEnvironment": "node"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node -r dotenv/config prisma/seed-egypt.ts"
   }
 }
