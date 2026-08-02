@@ -111,7 +111,7 @@ export class ReportsService {
       where: { customer: customerWhere },
       include: { customer: true },
       orderBy: { date: 'desc' },
-      take: 5
+      take: 50
     });
 
     const today = new Date();
@@ -146,7 +146,7 @@ export class ReportsService {
       where: { ...inventoryWhere, lastUpdated: { lt: stagnantDate }, physicalQty: { gt: 0 } },
       include: { variant: { include: { product: true } } },
       orderBy: { lastUpdated: 'asc' },
-      take: 5
+      take: 50
     });
 
     // Upcoming Installments (Customer)
@@ -157,7 +157,7 @@ export class ReportsService {
       },
       include: { plan: { include: { customer: true } } },
       orderBy: { dueDate: 'asc' },
-      take: 5
+      take: 50
     });
 
     // Upcoming Installments (Supplier)
@@ -168,7 +168,7 @@ export class ReportsService {
       },
       include: { plan: { include: { supplier: true } } },
       orderBy: { dueDate: 'asc' },
-      take: 5
+      take: 50
     });
 
     // Recent Transfers
@@ -195,7 +195,7 @@ export class ReportsService {
         user: true
       },
       orderBy: { createdAt: 'desc' },
-      take: 5
+      take: 50
     });
 
     return {
@@ -366,7 +366,7 @@ export class ReportsService {
       where: { companyId },
       include: { customer: true },
       orderBy: { issuedAt: 'desc' },
-      take: 50
+      take: 500
     });
     return { data: invoices };
   }
@@ -382,7 +382,7 @@ export class ReportsService {
   async getCustomerReports(companyId: string) {
     const customers = await this.prisma.customer.findMany({
       where: { companyId },
-      include: { transactions: { orderBy: { date: 'desc' }, take: 5 } }
+      include: { transactions: { orderBy: { date: 'desc' }, take: 50 } }
     });
     return { data: customers };
   }
@@ -390,7 +390,7 @@ export class ReportsService {
   async getSupplierReports(companyId: string) {
     const suppliers = await this.prisma.supplier.findMany({
       where: { companyId },
-      include: { transactions: { orderBy: { date: 'desc' }, take: 5 } }
+      include: { transactions: { orderBy: { date: 'desc' }, take: 50 } }
     });
     return { data: suppliers };
   }
