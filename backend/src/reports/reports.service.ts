@@ -254,7 +254,7 @@ export class ReportsService {
         };
       }
 
-      if (inst.dueDate < now) {
+      if (inst.dueDate && inst.dueDate < now) {
         report.totalOverdue += remaining;
         report.customers[customer.id].total += remaining;
 
@@ -326,7 +326,7 @@ export class ReportsService {
         };
       }
 
-      if (inst.dueDate < now) {
+      if (inst.dueDate && inst.dueDate < now) {
         report.totalOverdue += remaining;
         report.suppliers[supplier.id].total += remaining;
 
@@ -619,18 +619,18 @@ export class ReportsService {
         }
       });
 
-      const currentStock = variant.stocks.reduce((sum, s) => sum + s.quantity, 0);
+      const currentStock = variant.inventory.reduce((sum, s) => sum + s.physicalQty, 0);
 
       return {
         variantId: variant.id,
         productId: variant.productId,
         productName: variant.product.name,
-        code: variant.sku || variant.product.code,
+        code: variant.sku,
         category: variant.product.category?.name || 'غير مصنف',
         inflow,
         outflow,
         currentStock,
-        unit: variant.product.unit || 'قطعة'
+        unit: variant.product.baseUnit || 'قطعة'
       };
     });
 
