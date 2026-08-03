@@ -28,9 +28,14 @@ export function CustomerDispatchReport() {
   const fetchCustomers = async () => {
     try {
       const res = await fetch('/api/customers', { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setCustomers(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+        setCustomers(list);
+      }
     } catch (e) {
       console.error(e);
+      setCustomers([]);
     }
   };
 
@@ -50,6 +55,8 @@ export function CustomerDispatchReport() {
     }
   };
 
+  const customerList = Array.isArray(customers) ? customers : [];
+
   return (
     <div className="space-y-6">
       <div className="print:hidden flex flex-col md:flex-row justify-between items-start md:items-center bg-white/70 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-white/50 gap-4 transition-all hover:shadow-md">
@@ -65,7 +72,7 @@ export function CustomerDispatchReport() {
         <div className="w-full md:w-96 relative group">
           <label className="block text-xs font-bold text-indigo-900 mb-1">اختر العميل</label>
           <SearchableSelect
-            options={customers.map(c => ({ value: c.id, label: `${c.name} - ${c.code}` }))}
+            options={customerList.map(c => ({ value: c.id, label: `${c.name} - ${c.code}` }))}
             value={customerId}
             onChange={(val) => { setCustomerId(val); setPage(1); }}
             placeholder="ابحث عن عميل..."

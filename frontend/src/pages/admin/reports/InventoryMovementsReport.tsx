@@ -70,9 +70,10 @@ export function InventoryMovementsReport() {
       });
       if (!res.ok) throw new Error('فشل جلب التقرير');
       const data = await res.json();
-      setItems(data);
+      setItems(Array.isArray(data) ? data : []);
     } catch (err: any) {
       toast.error('خطأ', err.message);
+      setItems([]);
     } finally {
       setLoading(false);
     }
@@ -86,9 +87,10 @@ export function InventoryMovementsReport() {
       });
       if (!res.ok) throw new Error('فشل جلب تفاصيل الحركة');
       const data = await res.json();
-      setLedgerRecords(data);
+      setLedgerRecords(Array.isArray(data) ? data : []);
     } catch (err: any) {
       toast.error('خطأ', err.message);
+      setLedgerRecords([]);
     } finally {
       setLedgerLoading(false);
     }
@@ -99,7 +101,8 @@ export function InventoryMovementsReport() {
     fetchItemLedger(item.variantId);
   };
 
-  const filteredItems = items.filter(item => 
+  const safeItems = Array.isArray(items) ? items : [];
+  const filteredItems = safeItems.filter(item => 
     item.productName.toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.code.toLowerCase().includes(searchTerm.toLowerCase())
   );

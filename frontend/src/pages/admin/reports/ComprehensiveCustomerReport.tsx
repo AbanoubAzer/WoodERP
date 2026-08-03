@@ -95,9 +95,11 @@ export function ComprehensiveCustomerReport() {
       });
       if (!res.ok) throw new Error('فشل جلب بيانات العملاء');
       const data = await res.json();
-      setCustomers(data.data || data); // handle both paginated and non-paginated responses
+      const list = Array.isArray(data) ? data : Array.isArray(data?.data) ? data.data : [];
+      setCustomers(list);
     } catch (err: any) {
       toast.error('خطأ', err.message);
+      setCustomers([]);
     } finally {
       setLoading(false);
     }
@@ -112,10 +114,10 @@ export function ComprehensiveCustomerReport() {
     return { ...c, debit, credit, net, balanceStatus };
   };
 
-  const enrichedCustomers = customers.map(enrichCustomer);
+  const enrichedCustomers = (Array.isArray(customers) ? customers : []).map(enrichCustomer);
 
   // Sorting
-  let sortedCustomers = [...enrichedCustomers];
+  let sortedCustomers = Array.isArray(enrichedCustomers) ? [...enrichedCustomers] : [];
   if (selectedProfile !== 'DEFAULT' && selectedProfile !== 'HIGHEST_DEBT' && selectedProfile !== 'HIGHEST_CREDIT') {
     const profile = profiles.find(p => p.name === selectedProfile);
     if (profile) {
