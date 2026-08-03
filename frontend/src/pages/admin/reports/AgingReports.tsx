@@ -35,13 +35,17 @@ export function AgingReports() {
   }
 
   const currentData = activeTab === 'ar' ? arData : apData;
+  // Guard for missing summary data
+  if (!currentData?.summary) {
+    return <div className="p-12 text-center text-slate-500">لا توجد بيانات ملخص</div>;
+  }
   const isAr = activeTab === 'ar';
   
   const chartData = [
-    { name: '0-30 يوم', amount: currentData.summary['0-30'] },
-    { name: '31-60 يوم', amount: currentData.summary['31-60'] },
-    { name: '61-90 يوم', amount: currentData.summary['61-90'] },
-    { name: 'أكثر من 90 يوم', amount: currentData.summary['90+'] }
+    { name: '0-30 يوم', amount: currentData.summary['0-30'] || 0 },
+    { name: '31-60 يوم', amount: currentData.summary['31-60'] || 0 },
+    { name: '61-90 يوم', amount: currentData.summary['61-90'] || 0 },
+    { name: 'أكثر من 90 يوم', amount: currentData.summary['90+'] || 0 }
   ];
 
   return (
