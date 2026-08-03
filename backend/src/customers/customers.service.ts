@@ -16,6 +16,7 @@ export class CustomersService {
     if (existing) {
       throw new ConflictException('يوجد عميل بنفس الاسم بالفعل');
     }
+    
 
     return this.prisma.$transaction(async (prisma) => {
       const customer = await prisma.customer.create({
