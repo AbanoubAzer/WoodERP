@@ -48,8 +48,8 @@ export function DebtAging() {
   }
 
   const renderAgingBars = (data: AgingData, isPayable: boolean) => {
-    const total = data.summary.totalOverdue || 1; // Prevent division by zero
-    const colors = isPayable ? 
+    const total = data.summary?.totalOverdue || 1; // Prevent division by zero
+    const colors = isPayable ?
       ['bg-rose-400', 'bg-rose-500', 'bg-rose-600', 'bg-rose-700'] :
       ['bg-blue-400', 'bg-blue-500', 'bg-blue-600', 'bg-blue-700'];
 
@@ -105,7 +105,7 @@ export function DebtAging() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x md:divide-x-reverse divide-slate-100">
-        
+
         {/* AR - Accounts Receivable */}
         <div className="p-6">
           <div className="flex items-center gap-2 mb-2 text-blue-600">
@@ -114,9 +114,9 @@ export function DebtAging() {
           </div>
           <p className="text-sm text-slate-500 mb-4">إجمالي المبالغ المتأخرة على العملاء</p>
           <div className="text-3xl font-black text-slate-900 mb-6" dir="ltr">
-            {arData?.summary.totalOverdue.toLocaleString() || 0} <span className="text-lg text-slate-400">ج.م</span>
+            {arData?.summary?.totalOverdue.toLocaleString() || 0} <span className="text-lg text-slate-400">ج.م</span>
           </div>
-          
+
           {arData && renderAgingBars(arData, false)}
         </div>
 
@@ -128,9 +128,9 @@ export function DebtAging() {
           </div>
           <p className="text-sm text-slate-500 mb-4">إجمالي المبالغ المتأخرة لصالح الموردين</p>
           <div className="text-3xl font-black text-slate-900 mb-6" dir="ltr">
-            {apData?.summary.totalOverdue.toLocaleString() || 0} <span className="text-lg text-slate-400">ج.م</span>
+            {apData?.summary?.totalOverdue.toLocaleString() || 0} <span className="text-lg text-slate-400">ج.م</span>
           </div>
-          
+
           {apData && renderAgingBars(apData, true)}
         </div>
 

@@ -215,7 +215,7 @@ export class SalesService {
             const installmentsToCreate: any[] = [];
 
             if (data.customInstallments && data.customInstallments.length > 0) {
-              data.customInstallments.forEach((inst, index) => {
+              data.customInstallments.forEach((inst: any, index: number) => {
                 installmentsToCreate.push({
                   planId: plan.id,
                   installmentNumber: index + 1,
@@ -245,8 +245,10 @@ export class SalesService {
                   status: 'PENDING',
                 });
               }
-    });
-  }
+            }
+            await prisma.installment.createMany({ data: installmentsToCreate });
+          }
+        }
 
   async findAllInvoices(
     companyId: string,

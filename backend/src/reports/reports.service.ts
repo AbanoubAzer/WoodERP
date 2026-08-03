@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ReportsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async getDashboardData(companyId: string, locationId?: string, locationType?: string) {
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -120,11 +120,11 @@ export class ReportsService {
         status: 'PENDING',
         dueDate: { lt: today },
         plan: {
-           companyId,
-           OR: [
-             { customer: customerWhere },
-             { supplier: supplierWhere }
-           ]
+          companyId,
+          OR: [
+            { customer: customerWhere },
+            { supplier: supplierWhere }
+          ]
         }
       },
       include: {
@@ -151,8 +151,8 @@ export class ReportsService {
 
     // Upcoming Installments (Customer)
     const upcomingInstallments = await this.prisma.installment.findMany({
-      where: { 
-        plan: { customer: customerWhere }, 
+      where: {
+        plan: { customer: customerWhere },
         status: { not: 'PAID' }
       },
       include: { plan: { include: { customer: true } } },
@@ -162,8 +162,8 @@ export class ReportsService {
 
     // Upcoming Installments (Supplier)
     const supplierInstallments = await this.prisma.installment.findMany({
-      where: { 
-        plan: { supplier: supplierWhere }, 
+      where: {
+        plan: { supplier: supplierWhere },
         status: { not: 'PAID' }
       },
       include: { plan: { include: { supplier: true } } },
@@ -236,11 +236,11 @@ export class ReportsService {
     };
 
     const now = new Date();
-    
+
     installments.forEach(inst => {
       const remaining = inst.amount - inst.paidAmount;
       if (remaining <= 0) return;
-      
+
       const customer = inst.plan.customer!;
       if (!report.customers[customer.id]) {
         report.customers[customer.id] = {
@@ -255,7 +255,7 @@ export class ReportsService {
       }
 
       if (inst.dueDate && inst.dueDate < now) {
-        report.totalOverdue += remaining;
+        report?.totalOverdue += remaining;
         report.customers[customer.id].total += remaining;
 
         const diffTime = Math.abs(now.getTime() - inst.dueDate.getTime());
@@ -283,7 +283,7 @@ export class ReportsService {
         '31-60': report['31-60'],
         '61-90': report['61-90'],
         '90+': report['90+'],
-        totalOverdue: report.totalOverdue
+        totalOverdue: report?.totalOverdue
       },
       customers: Object.values(report.customers)
     };
@@ -308,11 +308,11 @@ export class ReportsService {
     };
 
     const now = new Date();
-    
+
     installments.forEach(inst => {
       const remaining = inst.amount - inst.paidAmount;
       if (remaining <= 0) return;
-      
+
       const supplier = inst.plan.supplier!;
       if (!report.suppliers[supplier.id]) {
         report.suppliers[supplier.id] = {
@@ -327,7 +327,7 @@ export class ReportsService {
       }
 
       if (inst.dueDate && inst.dueDate < now) {
-        report.totalOverdue += remaining;
+        report?.totalOverdue += remaining;
         report.suppliers[supplier.id].total += remaining;
 
         const diffTime = Math.abs(now.getTime() - inst.dueDate.getTime());
@@ -355,7 +355,7 @@ export class ReportsService {
         '31-60': report['31-60'],
         '61-90': report['61-90'],
         '90+': report['90+'],
-        totalOverdue: report.totalOverdue
+        totalOverdue: report?.totalOverdue
       },
       suppliers: Object.values(report.suppliers)
     };
@@ -399,7 +399,7 @@ export class ReportsService {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId, companyId },
     });
-    
+
     if (!customer) throw new Error('Customer not found');
 
     const transactions = await this.prisma.customerTransaction.findMany({
@@ -409,7 +409,7 @@ export class ReportsService {
     });
 
     const invoiceIds = transactions.filter(t => t.type === 'DEBIT' && t.referenceId).map(t => t.referenceId);
-    
+
     const invoices = await this.prisma.salesInvoice.findMany({
       where: { id: { in: invoiceIds as string[] } },
       include: {
@@ -432,48 +432,48 @@ export class ReportsService {
       where: { customerId }
     });
 
-    const defaultInvoiceNumber = allCustomerInvoices.length === 1 
-      ? allCustomerInvoices[0].invoiceNumber 
-      : (plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId)) 
-          ? customerInvoiceMap.get(plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId))!.referenceInvoiceId!) 
-          : (allCustomerInvoices.length > 0 ? allCustomerInvoices[allCustomerInvoices.length - 1].invoiceNumber : ''));
+    const defaultInvoiceNumber = allCustomerInvoices.length === 1
+      ? allCustomerInvoices[0].invoiceNumber
+      : (plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId))
+        ? customerInvoiceMap.get(plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId))!.referenceInvoiceId!)
+        : (allCustomerInvoices.length > 0 ? allCustomerInvoices[allCustomerInvoices.length - 1].invoiceNumber : ''));
 
     const statementLines = transactions.map(t => {
       if (t.type === 'DEBIT' && t.referenceId) {
         const inv = invoiceMap.get(t.referenceId);
         if (inv) {
-           return {
-             id: t.id,
-             date: t.date,
-             description: `فاتورة مبيعات ${inv.invoiceNumber}`,
-             invoiceNumber: inv.invoiceNumber,
-             totalAmount: inv.totalAmount,
-             amountPaid: inv.amountPaid,
-             remainingBalance: inv.totalAmount - inv.amountPaid,
-             items: inv.items.map(item => ({
-               productName: item.variant.product.name,
-               quantity: item.quantity,
-               price: item.unitPrice,
-               subtotal: item.subtotal
-             })),
-             value: t.amount,
-             payment: 0,
-             balance: t.runningBalance,
-             paymentMethodName: inv.paymentMethod?.name || (inv.amountPaid >= inv.totalAmount ? 'نقدي' : inv.amountPaid > 0 ? 'دفع جزئي' : 'آجل / تقسيط'),
-             paymentReference: inv.paymentReference
-           };
+          return {
+            id: t.id,
+            date: t.date,
+            description: `فاتورة مبيعات ${inv.invoiceNumber}`,
+            invoiceNumber: inv.invoiceNumber,
+            totalAmount: inv.totalAmount,
+            amountPaid: inv.amountPaid,
+            remainingBalance: inv.totalAmount - inv.amountPaid,
+            items: inv.items.map(item => ({
+              productName: item.variant.product.name,
+              quantity: item.quantity,
+              price: item.unitPrice,
+              subtotal: item.subtotal
+            })),
+            value: t.amount,
+            payment: 0,
+            balance: t.runningBalance,
+            paymentMethodName: inv.paymentMethod?.name || (inv.amountPaid >= inv.totalAmount ? 'نقدي' : inv.amountPaid > 0 ? 'دفع جزئي' : 'آجل / تقسيط'),
+            paymentReference: inv.paymentReference
+          };
         }
       }
-      let formattedReason = t.reason 
+      let formattedReason = t.reason
         ? t.reason
-            .replace(/Payment for Installment #?(\d+)/gi, 'سداد قسط رقم #$1')
-            .replace(/Payment for Installment/gi, 'سداد قسط')
-            .replace(/Opening Balance/gi, 'رصيد افتتاحي')
-            .replace(/Payment Receipt/gi, 'سند تحصيل / إيصال سداد')
-            .replace(/Sales Invoice/gi, 'فاتورة مبيعات')
-            .replace(/Purchase Invoice/gi, 'فاتورة مشتريات')
-            .replace(/Down payment/gi, 'دفعة مقدمة')
-            .replace(/Installment interest/gi, 'فوائد تقسيط')
+          .replace(/Payment for Installment #?(\d+)/gi, 'سداد قسط رقم #$1')
+          .replace(/Payment for Installment/gi, 'سداد قسط')
+          .replace(/Opening Balance/gi, 'رصيد افتتاحي')
+          .replace(/Payment Receipt/gi, 'سند تحصيل / إيصال سداد')
+          .replace(/Sales Invoice/gi, 'فاتورة مبيعات')
+          .replace(/Purchase Invoice/gi, 'فاتورة مشتريات')
+          .replace(/Down payment/gi, 'دفعة مقدمة')
+          .replace(/Installment interest/gi, 'فوائد تقسيط')
         : (t.type === 'CREDIT' ? 'ايداع بنك/نقدي' : 'معاملة');
 
       if (formattedReason.includes('سداد قسط') && !formattedReason.includes('فاتورة رقم') && defaultInvoiceNumber) {
@@ -535,7 +535,7 @@ export class ReportsService {
 
   async getSalesReport(companyId: string, startDate?: string, endDate?: string) {
     const whereClause: any = { companyId };
-    
+
     if (startDate || endDate) {
       whereClause.issuedAt = {};
       if (startDate) {
@@ -584,11 +584,11 @@ export class ReportsService {
         inv.items.forEach(item => {
           const prodName = `${item.variant.product.name} ${item.variant.sku ? `(${item.variant.sku})` : ''}`.trim();
           const prodId = item.variant.id;
-          
+
           if (!productsMap.has(prodId)) {
             productsMap.set(prodId, { id: prodId, name: prodName, quantity: 0, revenue: 0 });
           }
-          
+
           const p = productsMap.get(prodId)!;
           p.quantity += item.quantity;
           p.revenue += item.subtotal;
@@ -718,7 +718,7 @@ export class ReportsService {
 
   async getCustomerDispatchHistory(companyId: string, customerId: string, page = 1, limit = 50) {
     const skip = (page - 1) * limit;
-    
+
     const [total, movements] = await Promise.all([
       this.prisma.stockMovement.count({
         where: { companyId, customerId }

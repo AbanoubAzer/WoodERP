@@ -41,16 +41,22 @@ export function AgingReports() {
   }
   const isAr = activeTab === 'ar';
   
+  // Compute total overdue by summing all aging buckets
+  const totalOverdue = ['0-30', '31-60', '61-90', '90+'].reduce(
+    (sum, key) => sum + (currentData.summary[key] || 0),
+    0,
+  );
+
   const chartData = [
     { name: '0-30 يوم', amount: currentData.summary['0-30'] || 0 },
     { name: '31-60 يوم', amount: currentData.summary['31-60'] || 0 },
     { name: '61-90 يوم', amount: currentData.summary['61-90'] || 0 },
-    { name: 'أكثر من 90 يوم', amount: currentData.summary['90+'] || 0 }
+    { name: 'أكثر من 90 يوم', amount: currentData.summary['90+'] || 0 },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
         <div className="flex items-center space-x-3 space-x-reverse">
           <div className={`p-3 rounded-xl ${isAr ? 'bg-emerald-100' : 'bg-rose-100'}`}>
@@ -84,7 +90,7 @@ export function AgingReports() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-slate-500 text-sm font-semibold mb-1">إجمالي المتأخرات</p>
-              <h3 className="text-3xl font-black text-slate-900">{currentData.summary.totalOverdue.toLocaleString()} <span className="text-sm font-normal text-slate-500">ج.م</span></h3>
+              <h3 className="text-3xl font-black text-slate-900">{totalOverdue.toLocaleString()} <span className="text-sm font-normal text-slate-500">ج.م</span></h3>
             </div>
             <div className={`p-3 rounded-xl ${isAr ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
               {isAr ? <Users size={24} /> : <Building2 size={24} />}
