@@ -106,6 +106,7 @@ export class SalesService {
             companyId,
             type: 'ISSUE_SALE',
             referenceId: invoice.id,
+            customerId: customer.id,
             variantId: item.variantId,
             quantity: item.quantity,
             fromWarehouseId: item.warehouseId,

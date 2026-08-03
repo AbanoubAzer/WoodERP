@@ -597,10 +597,10 @@ export class ReportsService {
         product: {
           include: { category: true }
         },
-        movements: {
+        stockMovements: {
           where: movementWhere
         },
-        stocks: true
+        inventory: true
       }
     });
 
@@ -608,7 +608,7 @@ export class ReportsService {
       let inflow = 0;
       let outflow = 0;
 
-      variant.movements.forEach(m => {
+      variant.stockMovements.forEach(m => {
         if (m.type === 'RECEIVE') {
           inflow += m.quantity;
         } else if (m.type === 'ISSUE') {
@@ -654,7 +654,9 @@ export class ReportsService {
       orderBy: { createdAt: 'desc' },
       include: {
         fromWarehouse: true,
-        toWarehouse: true
+        toWarehouse: true,
+        customer: true,
+        supplier: true
       }
     });
 
@@ -666,8 +668,49 @@ export class ReportsService {
       referenceId: m.referenceId,
       reason: m.reason,
       fromWarehouse: m.fromWarehouse?.name,
-      toWarehouse: m.toWarehouse?.name
+      toWarehouse: m.toWarehouse?.name,
+      customerName: m.customer?.name,
+      supplierName: m.supplier?.name
     }));
+  }
+
+  async getCustomerDispatchHistory(companyId: string, customerId: string, page = 1, limit = 50) {
+    const skip = (page - 1) * limit;
+    
+    const [total, movements] = await Promise.all([
+      this.prisma.stockMovement.count({
+        where: { companyId, customerId }
+      }),
+      this.prisma.stockMovement.findMany({
+        where: { companyId, customerId },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+        include: {
+          variant: {
+            include: { product: true }
+          },
+          fromWarehouse: true
+        }
+      })
+    ]);
+
+    return {
+      total,
+      page,
+      totalPages: Math.ceil(total / limit),
+      movements: movements.map(m => ({
+        id: m.id,
+        date: m.createdAt,
+        type: m.type,
+        quantity: m.quantity,
+        referenceId: m.referenceId,
+        productName: m.variant.product.name,
+        size: `${m.variant.thickness || '-'} x ${m.variant.width || '-'} x ${m.variant.length || '-'}`,
+        warehouse: m.fromWarehouse?.name,
+        reason: m.reason
+      }))
+    };
   }
 }
 

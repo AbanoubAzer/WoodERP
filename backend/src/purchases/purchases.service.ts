@@ -92,6 +92,7 @@ export class PurchasesService {
             companyId,
             type: 'RECEIVE_PURCHASE',
             referenceId: invoice.id,
+            supplierId: supplier.id,
             variantId: item.variantId,
             quantity: item.quantity,
             toWarehouseId: item.warehouseId,

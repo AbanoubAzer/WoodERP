@@ -91,6 +91,7 @@ const menuGroups: { title: string; items: MenuItem[] }[] = [
         path: '/reports',
         subItems: [
           { label: 'حركة المخزون الشاملة', path: '/reports/inventory-movements' },
+          { label: 'تسليمات العملاء', path: '/reports/customer-dispatch' },
           { label: 'المبيعات والأرباح', path: '/reports/sales' },
           { label: 'تقرير المبيعات المتقدم', path: '/reports/sales-advanced' },
           { label: 'أعمار الديون (AR/AP)', path: '/reports/aging' },

@@ -45,10 +45,6 @@ export class ReportsController {
   }
 
   @Get('installments')
-  getInstallmentReports(@CurrentTenant() companyId: string) {
-    return this.reportsService.getInstallmentReports(companyId);
-  }
-
   @Get('profiles')
   getReportProfiles(
     @CurrentTenant() companyId: string,
@@ -114,5 +110,17 @@ export class ReportsController {
     @Query('endDate') endDate?: string,
   ) {
     return this.reportsService.getItemLedgerReport(companyId, variantId, startDate, endDate);
+  }
+
+  @Get('customers/:id/dispatch-history')
+  getCustomerDispatchHistory(
+    @CurrentTenant() companyId: string,
+    @Param('id') customerId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : 1;
+    const l = limit ? parseInt(limit, 10) : 50;
+    return this.reportsService.getCustomerDispatchHistory(companyId, customerId, p, l);
   }
 }

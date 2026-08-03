@@ -25,6 +25,8 @@ interface ItemLedgerRecord {
   reason: string | null;
   fromWarehouse: string | null;
   toWarehouse: string | null;
+  customerName?: string | null;
+  supplierName?: string | null;
 }
 
 export function InventoryMovementsReport() {
@@ -312,19 +314,43 @@ export function InventoryMovementsReport() {
                             </div>
                           </div>
                           
-                          {(record.referenceId || record.reason || record.fromWarehouse || record.toWarehouse) && (
-                            <div className="mt-3 pt-3 border-t border-slate-50 text-sm text-slate-600 grid grid-cols-2 gap-2 bg-slate-50/50 p-2 rounded-lg">
-                              {record.referenceId && (
-                                <div><span className="font-semibold">المرجع:</span> <span className="font-mono">{record.referenceId}</span></div>
-                              )}
-                              {record.reason && (
-                                <div><span className="font-semibold">السبب:</span> {record.reason}</div>
-                              )}
+                          {(record.referenceId || record.reason || record.fromWarehouse || record.toWarehouse || record.customerName || record.supplierName) && (
+                            <div className="mt-3 pt-3 border-t border-slate-50 text-sm text-slate-600 grid grid-cols-2 md:grid-cols-4 gap-3 bg-slate-50/50 p-3 rounded-xl border border-slate-100">
                               {record.fromWarehouse && (
-                                <div><span className="font-semibold">من مخزن:</span> {record.fromWarehouse}</div>
+                                <div className="col-span-2 md:col-span-1">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">من مخزن</span>
+                                  <span className="font-medium">{record.fromWarehouse}</span>
+                                </div>
                               )}
                               {record.toWarehouse && (
-                                <div><span className="font-semibold">إلى مخزن:</span> {record.toWarehouse}</div>
+                                <div className="col-span-2 md:col-span-1">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">إلى مخزن</span>
+                                  <span className="font-medium">{record.toWarehouse}</span>
+                                </div>
+                              )}
+                              {record.referenceId && (
+                                <div className="col-span-2 md:col-span-1">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">المرجع</span>
+                                  <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-slate-200">{record.referenceId.slice(0, 8)}...</span>
+                                </div>
+                              )}
+                              {record.customerName && (
+                                <div className="col-span-2 md:col-span-1">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">جهة منصرف (عميل)</span>
+                                  <span className="font-bold text-indigo-700">{record.customerName}</span>
+                                </div>
+                              )}
+                              {record.supplierName && (
+                                <div className="col-span-2 md:col-span-1">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">جهة وارد (مورد)</span>
+                                  <span className="font-bold text-emerald-700">{record.supplierName}</span>
+                                </div>
+                              )}
+                              {record.reason && (
+                                <div className="col-span-full">
+                                  <span className="block text-xs font-bold text-slate-400 mb-1">البيان / السبب</span>
+                                  <span>{record.reason}</span>
+                                </div>
                               )}
                             </div>
                           )}

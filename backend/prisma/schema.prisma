@@ -339,12 +339,21 @@ model StockMovement {
   toWarehouseId   String?
   reason          String?
   userId          String?
+  customerId      String?
+  supplierId      String?
   createdAt       DateTime @default(now())
 
   variant       ProductVariant @relation(fields: [variantId], references: [id])
   fromWarehouse Warehouse?     @relation("MovementFromWarehouse", fields: [fromWarehouseId], references: [id])
   toWarehouse   Warehouse?     @relation("MovementToWarehouse", fields: [toWarehouseId], references: [id])
   user          User?          @relation("MovementUser", fields: [userId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  supplier      Supplier?      @relation(fields: [supplierId], references: [id])
+
+  @@index([variantId])
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([createdAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -384,6 +393,7 @@ model Customer {
   payments         CustomerPayment[]
   salesInvoices    SalesInvoice[]
   installmentPlans InstallmentPlan[]
+  stockMovements   StockMovement[]
 
   @@unique([companyId, code])
 }
@@ -453,6 +463,7 @@ model Supplier {
   payments         SupplierPayment[]
   purchaseInvoices PurchaseInvoice[]
   installmentPlans InstallmentPlan[]
+  stockMovements   StockMovement[]
 
   @@unique([companyId, code])
 }

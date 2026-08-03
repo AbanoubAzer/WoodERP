@@ -23,6 +23,7 @@ import { IssueStock } from './pages/admin/inventory/IssueStock';
 import { StockTransfer } from './pages/admin/inventory/StockTransfer';
 import { Customers } from './pages/admin/customers/Customers';
 import { NewCustomer } from './pages/admin/customers/NewCustomer';
+import { CustomerDispatchReport } from './pages/admin/reports/CustomerDispatchReport';
 import { CustomerStatement } from './pages/admin/customers/CustomerStatement';
 import { Suppliers } from './pages/admin/suppliers/Suppliers';
 import { NewSupplier } from './pages/admin/suppliers/NewSupplier';
@@ -85,6 +86,7 @@ function App() {
             <Route index element={<Navigate to="inventory" replace />} />
             <Route path="inventory" element={<InventoryReports />} />
             <Route path="inventory-movements" element={<InventoryMovementsReport />} />
+            <Route path="customer-dispatch" element={<CustomerDispatchReport />} />
             <Route path="sales" element={<SalesReports />} />
             <Route path="sales-advanced" element={<SalesDateRangeReport />} />
             <Route path="aging" element={<AgingReports />} />
