@@ -57,34 +57,34 @@ export function DebtAging() {
       <div className="space-y-4 mt-6">
         <div className="flex justify-between items-center text-sm">
           <span className="font-bold text-slate-700">0-30 يوم</span>
-          <span className="font-bold">{data.summary['0-30'].toLocaleString()} ج.م</span>
+          <span className="font-bold">{(data.summary?.['0-30'] ?? 0).toLocaleString()} ج.م</span>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2">
-          <div className={`${colors[0]} h-2 rounded-full`} style={{ width: `${Math.min((data.summary['0-30'] / total) * 100, 100)}%` }}></div>
+          <div className={`${colors[0]} h-2 rounded-full`} style={{ width: `${Math.min(((data.summary?.['0-30'] ?? 0) / total) * 100, 100)}%` }}></div>
         </div>
 
         <div className="flex justify-between items-center text-sm">
           <span className="font-bold text-slate-700">31-60 يوم</span>
-          <span className="font-bold">{data.summary['31-60'].toLocaleString()} ج.م</span>
+          <span className="font-bold">{(data.summary?.['31-60'] ?? 0).toLocaleString()} ج.م</span>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2">
-          <div className={`${colors[1]} h-2 rounded-full`} style={{ width: `${Math.min((data.summary['31-60'] / total) * 100, 100)}%` }}></div>
+          <div className={`${colors[1]} h-2 rounded-full`} style={{ width: `${Math.min(((data.summary?.['31-60'] ?? 0) / total) * 100, 100)}%` }}></div>
         </div>
 
         <div className="flex justify-between items-center text-sm">
           <span className="font-bold text-slate-700">61-90 يوم</span>
-          <span className="font-bold">{data.summary['61-90'].toLocaleString()} ج.م</span>
+          <span className="font-bold">{(data.summary?.['61-90'] ?? 0).toLocaleString()} ج.م</span>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2">
-          <div className={`${colors[2]} h-2 rounded-full`} style={{ width: `${Math.min((data.summary['61-90'] / total) * 100, 100)}%` }}></div>
+          <div className={`${colors[2]} h-2 rounded-full`} style={{ width: `${Math.min(((data.summary?.['61-90'] ?? 0) / total) * 100, 100)}%` }}></div>
         </div>
 
         <div className="flex justify-between items-center text-sm">
           <span className="font-bold text-rose-600">أكثر من 90 يوم</span>
-          <span className="font-bold">{data.summary['90+'].toLocaleString()} ج.م</span>
+          <span className="font-bold">{(data.summary?.['90+'] ?? 0).toLocaleString()} ج.م</span>
         </div>
         <div className="w-full bg-slate-100 rounded-full h-2">
-          <div className={`${colors[3]} h-2 rounded-full`} style={{ width: `${Math.min((data.summary['90+'] / total) * 100, 100)}%` }}></div>
+          <div className={`${colors[3]} h-2 rounded-full`} style={{ width: `${Math.min(((data.summary?.['90+'] ?? 0) / total) * 100, 100)}%` }}></div>
         </div>
       </div>
     );
