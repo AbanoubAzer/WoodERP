@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Patch, Param, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Param,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -12,12 +20,19 @@ export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
 
   @Get()
-  getNotifications(@CurrentTenant() companyId: string, @CurrentUser() user: any) {
+  getNotifications(
+    @CurrentTenant() companyId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.notificationsService.getNotifications(companyId, user.sub);
   }
 
   @Patch(':id/read')
-  markAsRead(@Param('id') id: string, @CurrentTenant() companyId: string, @CurrentUser() user: any) {
+  markAsRead(
+    @Param('id') id: string,
+    @CurrentTenant() companyId: string,
+    @CurrentUser() user: any,
+  ) {
     return this.notificationsService.markAsRead(id, companyId, user.sub);
   }
 

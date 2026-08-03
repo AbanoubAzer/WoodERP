@@ -79,7 +79,7 @@ export function CustomerStatement() {
                 <th className="border border-slate-400 px-3 py-2 text-center w-16">كمية</th>
                 <th className="border border-slate-400 px-3 py-2 text-center w-20">سعر المتر</th>
                 <th className="border border-slate-400 px-3 py-2 text-center w-24">القيمة (مدين)</th>
-                <th className="border border-slate-400 px-3 py-2 text-center w-24">الدفعات (دائن)</th>
+                <th className="border border-slate-400 px-3 py-2 text-center w-24">طريقة الدفع</th>
                 <th className="border border-slate-400 px-3 py-2 text-center w-28">الرصيد</th>
               </tr>
             </thead>
@@ -104,6 +104,14 @@ export function CustomerStatement() {
                         <td className="border border-slate-400 px-3 py-2 text-center text-green-700 font-semibold">
                           {isFirst && row.payment > 0 ? Number(row.payment).toFixed(2) : ''}
                         </td>
+                        <td className="border border-slate-400 px-3 py-2 text-center text-xs">
+                          {isFirst && row.paymentMethodName ? (
+                            <div>
+                              <div className="font-bold">{row.paymentMethodName}</div>
+                              {row.paymentReference && <div className="text-slate-500">{row.paymentReference}</div>}
+                            </div>
+                          ) : ''}
+                        </td>
                         <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-50">
                           {isFirst ? Number(row.balance).toFixed(2) : ''}
                         </td>
@@ -120,6 +128,14 @@ export function CustomerStatement() {
                       <td className="border border-slate-400 px-3 py-2 text-center">-</td>
                       <td className="border border-slate-400 px-3 py-2 text-center text-red-700 font-semibold">{row.value > 0 ? Number(row.value).toFixed(2) : ''}</td>
                       <td className="border border-slate-400 px-3 py-2 text-center text-green-700 font-semibold">{row.payment > 0 ? Number(row.payment).toFixed(2) : ''}</td>
+                      <td className="border border-slate-400 px-3 py-2 text-center text-xs">
+                        {row.paymentMethodName ? (
+                          <div>
+                            <div className="font-bold">{row.paymentMethodName}</div>
+                            {row.paymentReference && <div className="text-slate-500">{row.paymentReference}</div>}
+                          </div>
+                        ) : ''}
+                      </td>
                       <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-100">{Number(row.balance).toFixed(2)}</td>
                     </tr>
                   );
@@ -139,6 +155,52 @@ export function CustomerStatement() {
           </div>
         </div>
       </div>
+
+      {statementData.pendingInstallments && statementData.pendingInstallments.length > 0 && (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 mt-6 print:border-none print:shadow-none print:p-0">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 border-b pb-2 print:border-b-2 print:border-black">الأقساط المتبقية للعميل</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-right text-sm">
+              <thead className="bg-slate-50 border-b border-slate-200 print:bg-slate-100 print:border-slate-400">
+                <tr>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:border print:border-slate-400">رقم القسط</th>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:border print:border-slate-400 text-center">تاريخ الاستحقاق</th>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:border print:border-slate-400 text-center">المبلغ المستحق</th>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:border print:border-slate-400 text-center">المدفوع</th>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:border print:border-slate-400 text-center">حالة القسط</th>
+                  <th className="py-3 px-4 font-semibold text-slate-700 print:hidden text-center">إجراءات</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {statementData.pendingInstallments.map((inst: any) => (
+                  <tr key={inst.id} className="hover:bg-slate-50">
+                    <td className="py-3 px-4 font-bold text-slate-800 print:border print:border-slate-400">قسط رقم {inst.installmentNumber}</td>
+                    <td className="py-3 px-4 text-center print:border print:border-slate-400">
+                      {inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('ar-EG') : <span className="text-amber-600 font-semibold bg-amber-50 px-2 py-1 rounded">بدون تاريخ / مفتوح</span>}
+                    </td>
+                    <td className="py-3 px-4 text-center font-bold print:border print:border-slate-400">{inst.amount.toLocaleString()} ج.م</td>
+                    <td className="py-3 px-4 text-center text-emerald-600 print:border print:border-slate-400">{inst.paidAmount.toLocaleString()} ج.م</td>
+                    <td className="py-3 px-4 text-center print:border print:border-slate-400">
+                      <span className={`px-2 py-1 rounded text-xs font-bold ${
+                        inst.status === 'OVERDUE' ? 'bg-rose-100 text-rose-700' :
+                        inst.status === 'PARTIAL' ? 'bg-blue-100 text-blue-700' :
+                        'bg-slate-100 text-slate-700'
+                      }`}>
+                        {inst.status === 'OVERDUE' ? 'متأخر' : inst.status === 'PARTIAL' ? 'مدفوع جزئياً' : 'قادم'}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-center print:hidden">
+                      <button className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors">
+                        سداد
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

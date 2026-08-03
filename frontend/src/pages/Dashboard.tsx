@@ -7,7 +7,8 @@ import { OverdueAlerts } from '../components/dashboard/OverdueAlerts';
 import { QuickActions } from '../components/dashboard/QuickActions';
 import { SalesAndProfits } from '../components/dashboard/SalesAndProfits';
 import { DebtAging } from '../components/dashboard/DebtAging';
-import { Wallet, TrendingDown, TrendingUp, Package, Activity } from 'lucide-react';
+import { Wallet, TrendingDown, TrendingUp, Package, Activity, Users, ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { DashboardSkeleton } from '../components/ui/Skeleton';
 
@@ -48,7 +49,46 @@ export function Dashboard() {
   return (
     <div className="space-y-8 max-w-[1600px] mx-auto">
 
+      {/* Feature Banner (Above Header as requested) */}
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-6 md:p-8 shadow-lg text-white flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden">
+        <div className="absolute -right-20 -top-20 w-64 h-64 bg-white/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="relative z-10">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="p-2 bg-white/20 rounded-lg">
+              <Users size={24} className="text-white" />
+            </div>
+            <h2 className="text-2xl font-bold">جديد: تقرير العملاء الشامل</h2>
+          </div>
+          <p className="text-blue-100 max-w-xl">
+            تعرف على الموقف المالي لعملائك بالكامل بنظرة واحدة. إمكانية ترتيب العملاء، تخصيص المجموعات، وعرض الإجماليات المباشرة للديون والمستحقات.
+          </p>
+        </div>
+        <div className="relative z-10 shrink-0">
+          <Link to="/reports/customers" className="flex items-center gap-2 bg-white text-indigo-700 px-6 py-3 rounded-xl font-bold hover:bg-blue-50 transition-colors shadow-sm">
+            <span>استعرض التقرير الآن</span>
+            <ArrowRight size={20} />
+          </Link>
+        </div>
+      </div>
 
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">لوحة القيادة</h1>
+          <p className="text-slate-500 font-medium mt-1">ملخص الأداء المالي والتشغيلي العام</p>
+        </div>
+        <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <div className="p-3 rounded-xl flex items-center justify-center bg-emerald-100">
+            <Activity className="text-emerald-600" size={24} />
+          </div>
+          <div>
+            <p className="text-xs font-bold text-slate-400">حالة المؤشرات</p>
+            <p className="text-xl font-black text-emerald-600">
+              مستقرة
+            </p>
+          </div>
+        </div>
+      </div>
       {/* Overdue Alerts */}
       <OverdueAlerts installments={data?.overdueInstallments || []} />
 
@@ -184,25 +224,6 @@ export function Dashboard() {
       {/* Recent Transfers (Full Width Bottom) */}
       <div className="pb-12">
         <RecentTransfersTracker transfers={data?.recentTransfers || []} />
-      </div>
-
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-        <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">لوحة القيادة</h1>
-          <p className="text-slate-500 font-medium mt-1">ملخص الأداء المالي والتشغيلي العام</p>
-        </div>
-        <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-100">
-          <div className="p-3 rounded-xl flex items-center justify-center bg-emerald-100">
-            <Activity className="text-emerald-600" size={24} />
-          </div>
-          <div>
-            <p className="text-xs font-bold text-slate-400">حالة المؤشرات</p>
-            <p className="text-xl font-black text-emerald-600">
-              مستقرة
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );

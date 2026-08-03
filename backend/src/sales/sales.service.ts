@@ -9,9 +9,9 @@ export class SalesService {
     return this.prisma.$transaction(async (prisma) => {
       // 1. Validate Customer
       const customer = await prisma.customer.findFirst({
-        where: { id: data.customerId, companyId }
+        where: { id: data.customerId, companyId },
       });
-      if (!customer) throw new BadRequestException('Customer not found');
+      if (!customer) throw new BadRequestException('العميل غير موجود');
 
       // 2. Validate Inventory & Calculate Totals
       let subtotal = 0;
@@ -20,35 +20,41 @@ export class SalesService {
           where: {
             companyId,
             warehouseId: item.warehouseId,
-            variantId: item.variantId
-          }
+            variantId: item.variantId,
+          },
         });
 
         if (!stock || stock.physicalQty < item.quantity) {
-          throw new BadRequestException(`Insufficient stock for variant ${item.variantId}`);
+          throw new BadRequestException(`رصيد غير كاف للصنف ${item.variantId}`);
         }
 
         subtotal += item.quantity * item.unitPrice;
       }
 
-      const totalAmount = subtotal - (data.discount || 0) + (data.taxAmount || 0);
+      const totalAmount =
+        subtotal - (data.discount || 0) + (data.taxAmount || 0);
 
       // 3. Credit Check (unless CASH)
       if (customer.paymentTerms !== 'CASH') {
         const lastTx = await prisma.customerTransaction.findFirst({
           where: { customerId: customer.id },
-          orderBy: { date: 'desc' }
+          orderBy: { date: 'desc' },
         });
         const currentBalance = lastTx ? lastTx.runningBalance : 0;
-        
-        if (customer.creditLimit > 0 && (currentBalance + totalAmount) > customer.creditLimit) {
-          throw new BadRequestException(`Credit limit exceeded. Current balance: ${currentBalance}, Limit: ${customer.creditLimit}`);
+
+        if (
+          customer.creditLimit > 0 &&
+          currentBalance + totalAmount > customer.creditLimit
+        ) {
+          throw new BadRequestException(
+            `تم تجاوز الحد الائتماني. الرصيد الحالي: ${currentBalance}، الحد: ${customer.creditLimit}`,
+          );
         }
       }
 
       // 4. Create Invoice
       const invoiceNumber = `INV-${new Date().getFullYear()}-${Date.now().toString().slice(-6)}`;
-      
+
       const amountPaid = Number(data.amountPaid) || 0;
 
       const invoice = await prisma.salesInvoice.create({
@@ -62,7 +68,14 @@ export class SalesService {
           taxAmount: data.taxAmount || 0,
           totalAmount,
           amountPaid: data.amountPaid || 0,
-          status: data.amountPaid >= totalAmount ? 'COMPLETED' : (data.amountPaid > 0 ? 'PARTIALLY_PAID' : 'PENDING'),
+          paymentMethodId: data.paymentMethodId || null,
+          paymentReference: data.paymentReference || null,
+          status:
+            data.amountPaid >= totalAmount
+              ? 'COMPLETED'
+              : data.amountPaid > 0
+                ? 'PARTIALLY_PAID'
+                : 'PENDING',
           notes: data.notes,
           createdById: userId,
           items: {
@@ -71,17 +84,21 @@ export class SalesService {
               warehouseId: item.warehouseId,
               quantity: item.quantity,
               unitPrice: item.unitPrice,
-              subtotal: item.quantity * item.unitPrice
-            }))
-          }
-        }
+              subtotal: item.quantity * item.unitPrice,
+            })),
+          },
+        },
       });
 
       // 5. Update Inventory & Movements
       for (const item of data.items) {
         await prisma.inventoryStock.updateMany({
-          where: { companyId, warehouseId: item.warehouseId, variantId: item.variantId },
-          data: { physicalQty: { decrement: item.quantity } }
+          where: {
+            companyId,
+            warehouseId: item.warehouseId,
+            variantId: item.variantId,
+          },
+          data: { physicalQty: { decrement: item.quantity } },
         });
 
         await prisma.stockMovement.create({
@@ -92,15 +109,15 @@ export class SalesService {
             variantId: item.variantId,
             quantity: item.quantity,
             fromWarehouseId: item.warehouseId,
-            reason: `Sales Invoice ${invoiceNumber}`
-          }
+            reason: `Sales Invoice ${invoiceNumber}`,
+          },
         });
       }
 
       // 6. Update Customer Ledger
       const lastTx = await prisma.customerTransaction.findFirst({
         where: { customerId: customer.id },
-        orderBy: { date: 'desc' }
+        orderBy: { date: 'desc' },
       });
       const currentBalance = lastTx ? lastTx.runningBalance : 0;
 
@@ -111,8 +128,8 @@ export class SalesService {
           amount: totalAmount,
           runningBalance: currentBalance + totalAmount,
           referenceId: invoice.id,
-          reason: `Sales Invoice ${invoiceNumber}`
-        }
+          reason: `Sales Invoice ${invoiceNumber}`,
+        },
       });
 
       let updatedBalance = currentBalance + totalAmount;
@@ -128,13 +145,13 @@ export class SalesService {
             amount: amountPaid,
             runningBalance: updatedBalance,
             referenceId: invoice.id,
-            reason: `دفعة مقدمة للفاتورة ${invoiceNumber}`
-          }
+            reason: `دفعة مقدمة للفاتورة ${invoiceNumber}`,
+          },
         });
 
         // B. Deposit into Treasury
         const treasury = await prisma.treasuryAccount.findFirst({
-          where: { id: data.treasuryAccountId, companyId }
+          where: { id: data.treasuryAccountId, companyId },
         });
         if (treasury) {
           await prisma.treasuryTransaction.create({
@@ -143,13 +160,13 @@ export class SalesService {
               type: 'DEPOSIT',
               amount: amountPaid,
               referenceId: invoice.id,
-              description: `تحصيل مقدم فاتورة بيع ${invoiceNumber}`
-            }
+              description: `تحصيل مقدم فاتورة بيع ${invoiceNumber}`,
+            },
           });
           // Update treasury balance
           await prisma.treasuryAccount.update({
             where: { id: treasury.id },
-            data: { balance: { increment: amountPaid } }
+            data: { balance: { increment: amountPaid } },
           });
         }
       }
@@ -173,8 +190,8 @@ export class SalesService {
                 amount: totalInterest,
                 runningBalance: updatedBalance,
                 referenceId: invoice.id,
-                reason: `فوائد تقسيط للفاتورة ${invoiceNumber}`
-              }
+                reason: `فوائد تقسيط للفاتورة ${invoiceNumber}`,
+              },
             });
           }
 
@@ -187,26 +204,28 @@ export class SalesService {
               numberOfMonths: data.installmentsCount,
               referenceInvoiceId: invoice.id,
               startDate: new Date(),
-              status: 'ACTIVE'
-            }
+              status: 'ACTIVE',
+            },
           });
 
           // Create Individual Installments
           const installmentsToCreate: any[] = [];
-          
+
           if (data.customInstallments && data.customInstallments.length > 0) {
             data.customInstallments.forEach((inst, index) => {
               installmentsToCreate.push({
                 planId: plan.id,
                 installmentNumber: index + 1,
                 amount: inst.amount,
-                dueDate: new Date(inst.dueDate),
-                status: 'PENDING'
+                dueDate: inst.dueDate ? new Date(inst.dueDate) : null,
+                status: 'PENDING',
               });
             });
           } else {
             // Fallback to old behavior
-            const baseDate = data.firstInstallmentDate ? new Date(data.firstInstallmentDate) : new Date();
+            const baseDate = data.firstInstallmentDate
+              ? new Date(data.firstInstallmentDate)
+              : new Date();
             for (let i = 1; i <= data.installmentsCount; i++) {
               const dueDate = new Date(baseDate);
               if (data.firstInstallmentDate) {
@@ -214,13 +233,13 @@ export class SalesService {
               } else {
                 dueDate.setMonth(dueDate.getMonth() + i);
               }
-              
+
               installmentsToCreate.push({
                 planId: plan.id,
                 installmentNumber: i,
                 amount: installmentAmount,
                 dueDate,
-                status: 'PENDING'
+                status: 'PENDING',
               });
             }
           }
@@ -232,13 +251,20 @@ export class SalesService {
     });
   }
 
-  async findAllInvoices(companyId: string, page = 1, limit = 50, search = '', locationId?: string, locationType?: string) {
-    let where: any = { companyId };
-    
+  async findAllInvoices(
+    companyId: string,
+    page = 1,
+    limit = 50,
+    search = '',
+    locationId?: string,
+    locationType?: string,
+  ) {
+    const where: any = { companyId };
+
     if (search) {
       where.OR = [
         { invoiceNumber: { contains: search, mode: 'insensitive' } },
-        { customer: { name: { contains: search, mode: 'insensitive' } } }
+        { customer: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
 
@@ -254,14 +280,14 @@ export class SalesService {
       this.prisma.salesInvoice.count({ where }),
       this.prisma.salesInvoice.findMany({
         where,
-        include: { 
+        include: {
           customer: true,
-          createdBy: { select: { id: true, name: true, email: true } }
+          createdBy: { select: { id: true, name: true, email: true } },
         },
         orderBy: { issuedAt: 'desc' },
         skip: (page - 1) * limit,
-        take: limit
-      })
+        take: limit,
+      }),
     ]);
 
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -276,17 +302,17 @@ export class SalesService {
         items: {
           include: {
             variant: { include: { product: true } },
-            warehouse: true
-          }
-        }
-      }
+            warehouse: true,
+          },
+        },
+      },
     });
 
     if (!invoice) return null;
 
     const installmentPlan = await this.prisma.installmentPlan.findFirst({
       where: { companyId, referenceInvoiceId: invoice.id },
-      include: { installments: { orderBy: { installmentNumber: 'asc' } } }
+      include: { installments: { orderBy: { installmentNumber: 'asc' } } },
     });
 
     return { ...invoice, installmentPlan };

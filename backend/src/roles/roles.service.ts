@@ -7,27 +7,27 @@ export class RolesService {
 
   create(companyId: string, data: any) {
     return this.prisma.role.create({
-      data: { ...data, companyId }
+      data: { ...data, companyId },
     });
   }
 
   findAll(companyId: string) {
     return this.prisma.role.findMany({
       where: { companyId },
-      include: { _count: { select: { users: true } } }
+      include: { _count: { select: { users: true } } },
     });
   }
 
   update(companyId: string, id: string, data: any) {
     return this.prisma.role.updateMany({
       where: { id, companyId, isDefault: false },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.role.deleteMany({
-      where: { id, companyId, isDefault: false }
+      where: { id, companyId, isDefault: false },
     });
   }
 }

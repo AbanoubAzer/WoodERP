@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Param, UseGuards, UseInterceptors, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+  Query,
+} from '@nestjs/common';
 import { SalesService } from './sales.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -12,7 +21,11 @@ export class SalesController {
   constructor(private readonly salesService: SalesService) {}
 
   @Post('invoice')
-  createInvoice(@CurrentTenant() companyId: string, @Body() data: any, @CurrentUser() user: any) {
+  createInvoice(
+    @CurrentTenant() companyId: string,
+    @Body() data: any,
+    @CurrentUser() user: any,
+  ) {
     return this.salesService.createInvoice(companyId, data, user.sub);
   }
 
@@ -31,7 +44,7 @@ export class SalesController {
       limit ? Number(limit) : undefined,
       search,
       locationId,
-      locationType
+      locationType,
     );
   }
 

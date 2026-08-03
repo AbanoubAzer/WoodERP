@@ -7,27 +7,27 @@ export class WarehousesService {
 
   create(companyId: string, data: any) {
     return this.prisma.warehouse.create({
-      data: { ...data, companyId }
+      data: { ...data, companyId },
     });
   }
 
   findAll(companyId: string) {
     return this.prisma.warehouse.findMany({
       where: { companyId },
-      include: { branch: true, manager: true, locations: true }
+      include: { branch: true, manager: true, locations: true },
     });
   }
 
   update(companyId: string, id: string, data: any) {
     return this.prisma.warehouse.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.warehouse.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }

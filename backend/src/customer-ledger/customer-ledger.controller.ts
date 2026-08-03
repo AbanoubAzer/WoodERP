@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { CustomerLedgerService } from './customer-ledger.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -14,15 +22,19 @@ export class CustomerLedgerController {
   addTransaction(
     @CurrentTenant() companyId: string,
     @Param('customerId') customerId: string,
-    @Body() data: any
+    @Body() data: any,
   ) {
-    return this.customerLedgerService.addTransaction(companyId, customerId, data);
+    return this.customerLedgerService.addTransaction(
+      companyId,
+      customerId,
+      data,
+    );
   }
 
   @Get(':customerId/statement')
   getStatement(
     @CurrentTenant() companyId: string,
-    @Param('customerId') customerId: string
+    @Param('customerId') customerId: string,
   ) {
     return this.customerLedgerService.getStatement(companyId, customerId);
   }

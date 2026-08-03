@@ -3,6 +3,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { ArrowLeftRight, Save } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { toast } from '../../../store/toastStore';
 
 export function TreasuryTransfer() {
   const token = useAuthStore(state => state.token);
@@ -26,7 +27,7 @@ export function TreasuryTransfer() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (fromAccountId === toAccountId) return alert('لا يمكن التحويل لنفس الحساب');
+    if (fromAccountId === toAccountId) return toast.error('لا يمكن التحويل لنفس الحساب');
     
     try {
       const response = await fetch('/api/treasury/transfer', {
@@ -48,11 +49,11 @@ export function TreasuryTransfer() {
         throw new Error(err.message || 'حدث خطأ أثناء التحويل');
       }
 
-      alert('تم التحويل بنجاح!');
+      toast.success('تم التحويل بنجاح!');
       navigate('/treasury');
     } catch (err: any) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

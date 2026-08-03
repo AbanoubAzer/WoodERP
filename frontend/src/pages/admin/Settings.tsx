@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import { Settings as SettingsIcon, Save } from 'lucide-react';
+import { toast } from '../../store/toastStore';
 
 export function Settings() {
   const token = useAuthStore(state => state.token);
@@ -38,7 +39,7 @@ export function Settings() {
         },
         body: JSON.stringify(settings)
       });
-      alert('تم حفظ الإعدادات بنجاح');
+      toast.success('تم حفظ الإعدادات بنجاح');
     } catch (err) {
       console.error(err);
     } finally {

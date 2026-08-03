@@ -16,9 +16,9 @@ export class InventoryService {
         warehouse: true,
         location: true,
         variant: {
-          include: { product: true }
-        }
-      }
+          include: { product: true },
+        },
+      },
     });
   }
 }

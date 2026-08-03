@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Body,
+  Param,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { InstallmentsService } from './installments.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -26,24 +35,27 @@ export class InstallmentsController {
   }
 
   @Put('plans/:id/notes')
-  async updatePlanNotes(@Param('id') id: string, @Body() body: { notes: string }) {
+  async updatePlanNotes(
+    @Param('id') id: string,
+    @Body() body: { notes: string },
+  ) {
     return this.installmentsService.updatePlanNotes(id, body.notes);
   }
 
   @Post(':id/pay')
   payInstallment(
-    @CurrentTenant() companyId: string, 
+    @CurrentTenant() companyId: string,
     @Param('id') id: string,
-    @Body() data: any
+    @Body() data: any,
   ) {
     return this.installmentsService.payInstallment(companyId, id, data);
   }
 
   @Post('plans/:id/settle')
   settlePlanEarly(
-    @CurrentTenant() companyId: string, 
+    @CurrentTenant() companyId: string,
     @Param('id') planId: string,
-    @Body() data: any
+    @Body() data: any,
   ) {
     return this.installmentsService.settlePlanEarly(companyId, planId, data);
   }

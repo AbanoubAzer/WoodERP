@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { Network, Plus, Folder, FileText } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { toast } from '../../../store/toastStore';
 
 export function ChartOfAccounts() {
   const token = useAuthStore(state => state.token);
@@ -49,7 +50,7 @@ export function ChartOfAccounts() {
       setCode(''); setName(''); setParentId('');
       fetchAccounts();
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

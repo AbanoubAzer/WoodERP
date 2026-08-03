@@ -1,4 +1,15 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, UseInterceptors, Delete, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  UseInterceptors,
+  Delete,
+  Query,
+} from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -28,12 +39,16 @@ export class CustomersController {
       page ? Number(page) : undefined,
       limit ? Number(limit) : undefined,
       search,
-      warehouseId
+      warehouseId,
     );
   }
 
   @Patch(':id')
-  update(@CurrentTenant() companyId: string, @Param('id') id: string, @Body() data: any) {
+  update(
+    @CurrentTenant() companyId: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
     return this.customersService.update(companyId, id, data);
   }
 

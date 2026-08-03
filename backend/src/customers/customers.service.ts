@@ -11,15 +11,15 @@ export class CustomersService {
 
     // Ensure phone/name uniqueness could be checked here
     const existing = await this.prisma.customer.findFirst({
-      where: { companyId, name: customerData.name }
+      where: { companyId, name: customerData.name },
     });
     if (existing) {
-      throw new ConflictException('Customer with this name already exists');
+      throw new ConflictException('يوجد عميل بنفس الاسم بالفعل');
     }
 
     return this.prisma.$transaction(async (prisma) => {
       const customer = await prisma.customer.create({
-        data: { ...customerData, code, companyId }
+        data: { ...customerData, code, companyId },
       });
 
       if (openingBalance && openingBalance > 0) {
@@ -29,8 +29,8 @@ export class CustomersService {
             type: 'DEBIT',
             amount: openingBalance,
             runningBalance: openingBalance,
-            reason: 'Opening Balance'
-          }
+            reason: 'Opening Balance',
+          },
         });
       }
 
@@ -38,7 +38,13 @@ export class CustomersService {
     });
   }
 
-  async findAll(companyId: string, page?: number, limit?: number, search?: string, warehouseId?: string) {
+  async findAll(
+    companyId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    warehouseId?: string,
+  ) {
     const where: any = { companyId };
     if (warehouseId) where.warehouseId = warehouseId;
     if (search) {
@@ -58,17 +64,18 @@ export class CustomersService {
           include: {
             transactions: {
               orderBy: { date: 'desc' },
-              take: 1
-            }
+              take: 1,
+            },
           },
           orderBy: { createdAt: 'desc' },
           skip,
-          take: limit
-        })
+          take: limit,
+        }),
       ]);
 
-      const data = customers.map(c => {
-        const balance = c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
+      const data = customers.map((c) => {
+        const balance =
+          c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
         const { transactions, ...rest } = c;
         return { ...rest, balance };
       });
@@ -81,14 +88,15 @@ export class CustomersService {
       include: {
         transactions: {
           orderBy: { date: 'desc' },
-          take: 1
-        }
+          take: 1,
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    return customers.map(c => {
-      const balance = c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
+    return customers.map((c) => {
+      const balance =
+        c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
       const { transactions, ...rest } = c;
       return { ...rest, balance };
     });
@@ -97,13 +105,13 @@ export class CustomersService {
   update(companyId: string, id: string, data: any) {
     return this.prisma.customer.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.customer.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }

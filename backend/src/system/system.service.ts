@@ -10,20 +10,20 @@ export class SystemService {
       include: {
         users: {
           where: { isOwner: true },
-          select: { name: true, email: true }
-        }
+          select: { name: true, email: true },
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async updateCompanyStatus(id: string, status: 'ACTIVE' | 'SUSPENDED') {
     const company = await this.prisma.company.findUnique({ where: { id } });
-    if (!company) throw new NotFoundException('Company not found');
-    
+    if (!company) throw new NotFoundException('الشركة غير موجودة');
+
     return this.prisma.company.update({
       where: { id },
-      data: { status }
+      data: { status },
     });
   }
 }

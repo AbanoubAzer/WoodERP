@@ -96,59 +96,67 @@ export function StockTransfer() {
 
       <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-100">
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">من المخزن (المصدر)</label>
-              <SearchableSelect
-                options={warehouses.map(w => ({ value: w.id, label: w.name }))}
-                value={formData.fromWarehouseId}
-                onChange={(val) => setFormData({...formData, fromWarehouseId: val})}
-                placeholder="ابحث عن مخزن..."
-              />
+          {warehouses.length <= 1 ? (
+            <div className="p-6 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 text-center font-bold">
+              عفواً، لا يمكن إجراء تحويل مخزني لعدم وجود أكثر من مخزن واحد في النظام.
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">من المخزن (المصدر)</label>
+                <SearchableSelect
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+                  value={formData.fromWarehouseId}
+                  onChange={(val) => setFormData({...formData, fromWarehouseId: val})}
+                  placeholder="ابحث عن مخزن..."
+                />
+              </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">إلى المخزن (الوجهة)</label>
-              <SearchableSelect
-                options={warehouses.map(w => ({ value: w.id, label: w.name }))}
-                value={formData.toWarehouseId}
-                onChange={(val) => setFormData({...formData, toWarehouseId: val})}
-                placeholder="ابحث عن مخزن..."
-              />
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">إلى المخزن (الوجهة)</label>
+                <SearchableSelect
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+                  value={formData.toWarehouseId}
+                  onChange={(val) => setFormData({...formData, toWarehouseId: val})}
+                  placeholder="ابحث عن مخزن..."
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-slate-700 mb-2">المنتج (الصنف والمقاس)</label>
+                <SearchableSelect
+                  options={products.flatMap(p => 
+                    (p.variants || []).map((v: any) => ({
+                      value: v.id,
+                      label: `${p.name} - مقاس: ${v.thickness}×${v.width}×${v.length}`
+                    }))
+                  )}
+                  value={formData.variantId}
+                  onChange={(val) => setFormData({...formData, variantId: val})}
+                  placeholder="ابحث عن صنف أو مقاس..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">الكمية المحولة (بالوحدة)</label>
+                <input type="number" required min="0.01" step="any" value={formData.quantity} onChange={e => setFormData({...formData, quantity: parseFloat(e.target.value) || 0})} className="w-full px-3 py-2 border rounded-lg focus:ring-[var(--color-brand-primary)]" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">سبب التحويل (اختياري)</label>
+                <input type="text" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="مثال: تغذية مخزن الفرع" className="w-full px-3 py-2 border rounded-lg focus:ring-[var(--color-brand-primary)]" />
+              </div>
             </div>
+          )}
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">المنتج (الصنف والمقاس)</label>
-              <SearchableSelect
-                options={products.flatMap(p => 
-                  (p.variants || []).map((v: any) => ({
-                    value: v.id,
-                    label: `${p.name} - مقاس: ${v.thickness}×${v.width}×${v.length}`
-                  }))
-                )}
-                value={formData.variantId}
-                onChange={(val) => setFormData({...formData, variantId: val})}
-                placeholder="ابحث عن صنف أو مقاس..."
-              />
+          {warehouses.length > 1 && (
+            <div className="flex justify-end pt-6 border-t border-slate-100">
+              <button type="submit" className="flex items-center space-x-2 space-x-reverse px-8 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors">
+                <Save size={20} />
+                <span>تأكيد التحويل</span>
+              </button>
             </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">الكمية المحولة (بالوحدة)</label>
-              <input type="number" required min="0.01" step="any" value={formData.quantity} onChange={e => setFormData({...formData, quantity: parseFloat(e.target.value) || 0})} className="w-full px-3 py-2 border rounded-lg focus:ring-[var(--color-brand-primary)]" />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">سبب التحويل (اختياري)</label>
-              <input type="text" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})} placeholder="مثال: تغذية مخزن الفرع" className="w-full px-3 py-2 border rounded-lg focus:ring-[var(--color-brand-primary)]" />
-            </div>
-          </div>
-
-          <div className="flex justify-end pt-6 border-t border-slate-100">
-            <button type="submit" className="flex items-center space-x-2 space-x-reverse px-8 py-3 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 transition-colors">
-              <Save size={20} />
-              <span>تأكيد التحويل</span>
-            </button>
-          </div>
+          )}
         </form>
       </div>
     </div>

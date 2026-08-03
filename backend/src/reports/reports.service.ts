@@ -404,7 +404,8 @@ export class ReportsService {
 
     const transactions = await this.prisma.customerTransaction.findMany({
       where: { customerId },
-      orderBy: { date: 'asc' }
+      orderBy: { date: 'asc' },
+      include: { paymentMethod: true }
     });
 
     const invoiceIds = transactions.filter(t => t.type === 'DEBIT' && t.referenceId).map(t => t.referenceId);
@@ -447,11 +448,226 @@ export class ReportsService {
         items: [],
         value: t.type === 'DEBIT' ? t.amount : 0,
         payment: t.type === 'CREDIT' ? t.amount : 0,
-        balance: t.runningBalance
+        balance: t.runningBalance,
+        paymentMethodName: t.paymentMethod?.name,
+        paymentReference: t.paymentReference
       };
     });
 
-    return { customer, statement: statementLines };
+    const pendingInstallments = await this.prisma.installment.findMany({
+      where: {
+        plan: { customerId },
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] }
+      },
+      orderBy: { dueDate: 'asc' }
+    });
+
+    return { customer, statement: statementLines, pendingInstallments };
+  }
+
+  async getReportProfiles(companyId: string, type?: string) {
+    return this.prisma.reportProfile.findMany({
+      where: {
+        companyId,
+        ...(type && { type }),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async saveReportProfile(companyId: string, data: any) {
+    return this.prisma.reportProfile.create({
+      data: {
+        companyId,
+        name: data.name,
+        type: data.type || 'CUSTOMER_ORDER',
+        data: data.data,
+      },
+    });
+  }
+
+  async deleteReportProfile(companyId: string, id: string) {
+    return this.prisma.reportProfile.delete({
+      where: {
+        id,
+      },
+    });
+  }
+
+  async getSalesReport(companyId: string, startDate?: string, endDate?: string) {
+    const whereClause: any = { companyId };
+    
+    if (startDate || endDate) {
+      whereClause.issuedAt = {};
+      if (startDate) {
+        whereClause.issuedAt.gte = new Date(startDate);
+      }
+      if (endDate) {
+        // Set to end of day
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        whereClause.issuedAt.lte = end;
+      }
+    }
+
+    const invoices = await this.prisma.salesInvoice.findMany({
+      where: whereClause,
+      include: {
+        customer: { select: { name: true, code: true } },
+        items: {
+          include: {
+            variant: {
+              include: {
+                product: { select: { name: true } }
+              }
+            }
+          }
+        }
+      },
+      orderBy: { issuedAt: 'desc' }
+    });
+
+    let totalSales = 0;
+    let totalCollected = 0;
+    let totalOutstanding = 0;
+    const totalInvoices = invoices.length;
+
+    const productsMap = new Map<string, { id: string, name: string, quantity: number, revenue: number }>();
+
+    invoices.forEach(inv => {
+      // Exclude cancelled from totals if needed, but standard is to include COMPLETED
+      if (inv.status !== 'CANCELLED') {
+        totalSales += inv.totalAmount;
+        totalCollected += inv.amountPaid;
+        totalOutstanding += (inv.totalAmount - inv.amountPaid);
+
+        inv.items.forEach(item => {
+          const prodName = `${item.variant.product.name} ${item.variant.sku ? `(${item.variant.sku})` : ''}`.trim();
+          const prodId = item.variant.id;
+          
+          if (!productsMap.has(prodId)) {
+            productsMap.set(prodId, { id: prodId, name: prodName, quantity: 0, revenue: 0 });
+          }
+          
+          const p = productsMap.get(prodId)!;
+          p.quantity += item.quantity;
+          p.revenue += item.subtotal;
+        });
+      }
+    });
+
+    const topProducts = Array.from(productsMap.values()).sort((a, b) => b.revenue - a.revenue);
+
+    return {
+      kpis: {
+        totalSales,
+        totalInvoices,
+        totalCollected,
+        totalOutstanding,
+      },
+      invoices: invoices.map(inv => ({
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        customerName: inv.customer.name,
+        issuedAt: inv.issuedAt,
+        totalAmount: inv.totalAmount,
+        amountPaid: inv.amountPaid,
+        balance: inv.totalAmount - inv.amountPaid,
+        status: inv.status
+      })),
+      topProducts
+    };
+  }
+
+  async getInventoryMovementsReport(companyId: string, startDate?: string, endDate?: string) {
+    const movementWhere: any = { companyId };
+    if (startDate || endDate) {
+      movementWhere.createdAt = {};
+      if (startDate) movementWhere.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        movementWhere.createdAt.lte = end;
+      }
+    }
+
+    const products = await this.prisma.productVariant.findMany({
+      where: { product: { companyId } },
+      include: {
+        product: {
+          include: { category: true }
+        },
+        movements: {
+          where: movementWhere
+        },
+        stocks: true
+      }
+    });
+
+    const report = products.map(variant => {
+      let inflow = 0;
+      let outflow = 0;
+
+      variant.movements.forEach(m => {
+        if (m.type === 'RECEIVE') {
+          inflow += m.quantity;
+        } else if (m.type === 'ISSUE') {
+          outflow += m.quantity;
+        } else if (m.type === 'ADJUST') {
+          if (m.quantity > 0) inflow += m.quantity;
+          else outflow += Math.abs(m.quantity);
+        }
+      });
+
+      const currentStock = variant.stocks.reduce((sum, s) => sum + s.quantity, 0);
+
+      return {
+        variantId: variant.id,
+        productId: variant.productId,
+        productName: variant.product.name,
+        code: variant.sku || variant.product.code,
+        category: variant.product.category?.name || 'غير مصنف',
+        inflow,
+        outflow,
+        currentStock,
+        unit: variant.product.unit || 'قطعة'
+      };
+    });
+
+    return report;
+  }
+
+  async getItemLedgerReport(companyId: string, variantId: string, startDate?: string, endDate?: string) {
+    const where: any = { companyId, variantId };
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        where.createdAt.lte = end;
+      }
+    }
+
+    const movements = await this.prisma.stockMovement.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        fromWarehouse: true,
+        toWarehouse: true
+      }
+    });
+
+    return movements.map(m => ({
+      id: m.id,
+      date: m.createdAt,
+      type: m.type,
+      quantity: m.quantity,
+      referenceId: m.referenceId,
+      reason: m.reason,
+      fromWarehouse: m.fromWarehouse?.name,
+      toWarehouse: m.toWarehouse?.name
+    }));
   }
 }
 

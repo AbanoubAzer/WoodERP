@@ -12,15 +12,15 @@ export class StockTransactionsService {
         where: {
           warehouseId: data.warehouseId,
           locationId: data.locationId || null,
-          variantId: data.variantId
-        }
+          variantId: data.variantId,
+        },
       });
 
       let stock;
       if (existingStock) {
         stock = await prisma.inventoryStock.update({
           where: { id: existingStock.id },
-          data: { physicalQty: { increment: data.quantity } }
+          data: { physicalQty: { increment: data.quantity } },
         });
       } else {
         stock = await prisma.inventoryStock.create({
@@ -29,8 +29,8 @@ export class StockTransactionsService {
             warehouseId: data.warehouseId,
             locationId: data.locationId || null,
             variantId: data.variantId,
-            physicalQty: data.quantity
-          }
+            physicalQty: data.quantity,
+          },
         });
       }
 
@@ -44,8 +44,8 @@ export class StockTransactionsService {
           toWarehouseId: data.warehouseId,
           reason: data.reason,
           referenceId: data.referenceId,
-          userId
-        }
+          userId,
+        },
       });
 
       return { stock, movement };
@@ -59,18 +59,18 @@ export class StockTransactionsService {
         where: {
           warehouseId: data.warehouseId,
           locationId: data.locationId || null,
-          variantId: data.variantId
-        }
+          variantId: data.variantId,
+        },
       });
 
       if (!stock || stock.physicalQty < data.quantity) {
-        throw new BadRequestException('Insufficient stock in this location');
+        throw new BadRequestException('الرصيد غير كاف في هذا الموقع');
       }
 
       // 2. Decrease stock
       const updatedStock = await prisma.inventoryStock.update({
         where: { id: stock.id },
-        data: { physicalQty: { decrement: data.quantity } }
+        data: { physicalQty: { decrement: data.quantity } },
       });
 
       // 3. Record Movement
@@ -83,8 +83,8 @@ export class StockTransactionsService {
           fromWarehouseId: data.warehouseId,
           reason: data.reason,
           referenceId: data.referenceId,
-          userId
-        }
+          userId,
+        },
       });
 
       return { stock: updatedStock, movement };
@@ -93,7 +93,7 @@ export class StockTransactionsService {
 
   async transfer(companyId: string, userId: string, data: any) {
     if (data.fromWarehouseId === data.toWarehouseId) {
-      throw new BadRequestException('Source and destination warehouses must be different');
+      throw new BadRequestException('يجب أن يكون مخزن المصدر والوجهة مختلفين');
     }
 
     return this.prisma.$transaction(async (prisma) => {
@@ -102,18 +102,18 @@ export class StockTransactionsService {
         where: {
           warehouseId: data.fromWarehouseId,
           locationId: null,
-          variantId: data.variantId
-        }
+          variantId: data.variantId,
+        },
       });
 
       if (!sourceStock || sourceStock.physicalQty < data.quantity) {
-        throw new BadRequestException('Insufficient stock in the source warehouse');
+        throw new BadRequestException('الرصيد غير كاف في مخزن المصدر');
       }
 
       // 2. Decrease stock in source warehouse
       await prisma.inventoryStock.update({
         where: { id: sourceStock.id },
-        data: { physicalQty: { decrement: data.quantity } }
+        data: { physicalQty: { decrement: data.quantity } },
       });
 
       // 3. Upsert (Increase or Create) stock in destination warehouse
@@ -121,15 +121,15 @@ export class StockTransactionsService {
         where: {
           warehouseId: data.toWarehouseId,
           locationId: null,
-          variantId: data.variantId
-        }
+          variantId: data.variantId,
+        },
       });
 
       let destinationStock;
       if (destStockExist) {
         destinationStock = await prisma.inventoryStock.update({
           where: { id: destStockExist.id },
-          data: { physicalQty: { increment: data.quantity } }
+          data: { physicalQty: { increment: data.quantity } },
         });
       } else {
         destinationStock = await prisma.inventoryStock.create({
@@ -138,8 +138,8 @@ export class StockTransactionsService {
             warehouseId: data.toWarehouseId,
             locationId: null,
             variantId: data.variantId,
-            physicalQty: data.quantity
-          }
+            physicalQty: data.quantity,
+          },
         });
       }
 
@@ -153,8 +153,8 @@ export class StockTransactionsService {
           fromWarehouseId: data.fromWarehouseId,
           toWarehouseId: data.toWarehouseId,
           reason: data.reason,
-          userId
-        }
+          userId,
+        },
       });
 
       return { sourceStock, destinationStock, movement };

@@ -12,8 +12,8 @@ export class AccountingService {
         code: data.code,
         name: data.name,
         type: data.type,
-        parentId: data.parentId || null
-      }
+        parentId: data.parentId || null,
+      },
     });
   }
 
@@ -21,7 +21,7 @@ export class AccountingService {
     return this.prisma.account.findMany({
       where: { companyId },
       include: { children: true },
-      orderBy: { code: 'asc' }
+      orderBy: { code: 'asc' },
     });
   }
 
@@ -29,17 +29,19 @@ export class AccountingService {
     // Validate Debits == Credits
     let totalDebit = 0;
     let totalCredit = 0;
-    
+
     for (const line of data.lines) {
       totalDebit += parseFloat(line.debit || 0);
       totalCredit += parseFloat(line.credit || 0);
     }
 
     if (Math.abs(totalDebit - totalCredit) > 0.01) {
-      throw new BadRequestException(`Unbalanced entry. Debits: ${totalDebit}, Credits: ${totalCredit}`);
+      throw new BadRequestException(
+        `قيد غير متزن. المدين: ${totalDebit}، الدائن: ${totalCredit}`,
+      );
     }
     if (totalDebit <= 0) {
-      throw new BadRequestException('Total amount must be greater than zero');
+      throw new BadRequestException('يجب أن يكون إجمالي المبلغ أكبر من صفر');
     }
 
     return this.prisma.journalEntry.create({
@@ -53,11 +55,11 @@ export class AccountingService {
             accountId: l.accountId,
             debit: parseFloat(l.debit || 0),
             credit: parseFloat(l.credit || 0),
-            description: l.description
-          }))
-        }
+            description: l.description,
+          })),
+        },
       },
-      include: { lines: { include: { account: true } } }
+      include: { lines: { include: { account: true } } },
     });
   }
 
@@ -65,9 +67,9 @@ export class AccountingService {
     return this.prisma.journalEntry.findMany({
       where: { companyId },
       include: {
-        lines: { include: { account: true } }
+        lines: { include: { account: true } },
       },
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
     });
   }
 
@@ -81,9 +83,9 @@ export class AccountingService {
           amount: parseFloat(data.amount),
           date: data.date ? new Date(data.date) : new Date(),
           description: data.description,
-          referenceNumber: data.referenceNumber
+          referenceNumber: data.referenceNumber,
         },
-        include: { account: true }
+        include: { account: true },
       });
 
       // Find the "Cash" account for this company (assuming code '1001' or similar, we'll try to find a CASH type or default to first ASSET)
@@ -100,16 +102,16 @@ export class AccountingService {
                 {
                   accountId: expense.accountId, // Debit Expense
                   debit: expense.amount,
-                  credit: 0
+                  credit: 0,
                 },
                 {
                   accountId: data.paymentAccountId, // Credit Cash/Bank
                   debit: 0,
-                  credit: expense.amount
-                }
-              ]
-            }
-          }
+                  credit: expense.amount,
+                },
+              ],
+            },
+          },
         });
       }
 
@@ -121,7 +123,7 @@ export class AccountingService {
     return this.prisma.expense.findMany({
       where: { companyId },
       include: { account: true },
-      orderBy: { date: 'desc' }
+      orderBy: { date: 'desc' },
     });
   }
 }

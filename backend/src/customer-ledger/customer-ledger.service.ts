@@ -8,28 +8,33 @@ export class CustomerLedgerService {
   async addTransaction(companyId: string, customerId: string, data: any) {
     return this.prisma.$transaction(async (prisma) => {
       const customer = await prisma.customer.findFirst({
-        where: { id: customerId, companyId }
+        where: { id: customerId, companyId },
       });
-      if (!customer) throw new BadRequestException('Customer not found');
+      if (!customer) throw new BadRequestException('العميل غير موجود');
 
       // Get last transaction for balance
       const lastTx = await prisma.customerTransaction.findFirst({
         where: { customerId },
-        orderBy: { date: 'desc' }
+        orderBy: { date: 'desc' },
       });
 
       let currentBalance = lastTx ? lastTx.runningBalance : 0;
-      let amount = parseFloat(data.amount);
+      const amount = parseFloat(data.amount);
 
       if (data.type === 'DEBIT') {
-        if (customer.creditLimit > 0 && currentBalance + amount > customer.creditLimit) {
-          throw new BadRequestException(`Credit limit exceeded! Customer limit is ${customer.creditLimit}`);
+        if (
+          customer.creditLimit > 0 &&
+          currentBalance + amount > customer.creditLimit
+        ) {
+          throw new BadRequestException(
+            `تم تجاوز الحد الائتماني! حد العميل هو ${customer.creditLimit}`,
+          );
         }
         currentBalance += amount;
       } else if (data.type === 'CREDIT') {
         currentBalance -= amount;
       } else {
-        throw new BadRequestException('Invalid transaction type');
+        throw new BadRequestException('نوع الحركة غير صالح');
       }
 
       const transaction = await prisma.customerTransaction.create({
@@ -39,8 +44,8 @@ export class CustomerLedgerService {
           amount,
           runningBalance: currentBalance,
           reason: data.reason,
-          referenceId: data.referenceId
-        }
+          referenceId: data.referenceId,
+        },
       });
 
       return transaction;
@@ -49,15 +54,26 @@ export class CustomerLedgerService {
 
   async getStatement(companyId: string, customerId: string) {
     const customer = await this.prisma.customer.findFirst({
-      where: { id: customerId, companyId }
+      where: { id: customerId, companyId },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException('العميل غير موجود');
 
     const transactions = await this.prisma.customerTransaction.findMany({
       where: { customerId },
-      orderBy: { date: 'asc' }
+      orderBy: { date: 'asc' },
+      include: {
+        paymentMethod: true
+      }
     });
 
-    return { customer, transactions };
+    const pendingInstallments = await this.prisma.installment.findMany({
+      where: {
+        plan: { customerId },
+        status: { in: ['PENDING', 'PARTIAL', 'OVERDUE'] }
+      },
+      orderBy: { dueDate: 'asc' }
+    });
+
+    return { customer, transactions, pendingInstallments };
   }
 }

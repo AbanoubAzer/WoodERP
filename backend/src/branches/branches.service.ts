@@ -24,7 +24,7 @@ export class BranchesService {
     const branch = await this.prisma.branch.findFirst({
       where: { id, companyId },
     });
-    if (!branch) throw new NotFoundException('Branch not found');
+    if (!branch) throw new NotFoundException('الفرع غير موجود');
     return branch;
   }
 

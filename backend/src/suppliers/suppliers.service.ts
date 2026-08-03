@@ -10,15 +10,15 @@ export class SuppliersService {
     const code = `SUP-${Date.now().toString().slice(-6)}`;
 
     const existing = await this.prisma.supplier.findFirst({
-      where: { companyId, name: supplierData.name }
+      where: { companyId, name: supplierData.name },
     });
     if (existing) {
-      throw new ConflictException('Supplier with this name already exists');
+      throw new ConflictException('يوجد مورد بنفس الاسم بالفعل');
     }
 
     return this.prisma.$transaction(async (prisma) => {
       const supplier = await prisma.supplier.create({
-        data: { ...supplierData, code, companyId }
+        data: { ...supplierData, code, companyId },
       });
 
       if (openingBalance && openingBalance > 0) {
@@ -28,8 +28,8 @@ export class SuppliersService {
             type: 'PURCHASE', // PURCHASE increases what we owe the supplier
             amount: openingBalance,
             runningBalance: openingBalance,
-            reason: 'Opening Balance'
-          }
+            reason: 'Opening Balance',
+          },
         });
       }
 
@@ -37,7 +37,13 @@ export class SuppliersService {
     });
   }
 
-  async findAll(companyId: string, page?: number, limit?: number, search?: string, warehouseId?: string) {
+  async findAll(
+    companyId: string,
+    page?: number,
+    limit?: number,
+    search?: string,
+    warehouseId?: string,
+  ) {
     const where: any = { companyId };
     if (warehouseId) where.warehouseId = warehouseId;
     if (search) {
@@ -57,17 +63,18 @@ export class SuppliersService {
           include: {
             transactions: {
               orderBy: { date: 'desc' },
-              take: 1
-            }
+              take: 1,
+            },
           },
           orderBy: { createdAt: 'desc' },
           skip,
-          take: limit
-        })
+          take: limit,
+        }),
       ]);
 
-      const data = suppliers.map(s => {
-        const balance = s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
+      const data = suppliers.map((s) => {
+        const balance =
+          s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
         const { transactions, ...rest } = s;
         return { ...rest, balance };
       });
@@ -80,14 +87,15 @@ export class SuppliersService {
       include: {
         transactions: {
           orderBy: { date: 'desc' },
-          take: 1
-        }
+          take: 1,
+        },
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    return suppliers.map(s => {
-      const balance = s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
+    return suppliers.map((s) => {
+      const balance =
+        s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
       const { transactions, ...rest } = s;
       return { ...rest, balance };
     });
@@ -96,13 +104,13 @@ export class SuppliersService {
   update(companyId: string, id: string, data: any) {
     return this.prisma.supplier.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.supplier.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }

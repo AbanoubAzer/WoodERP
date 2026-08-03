@@ -26,7 +26,7 @@ export function SystemCompanies() {
       const res = await fetch('/api/system/companies', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error('Failed to fetch');
+      if (!res.ok) throw new Error('فشل في جلب البيانات');
       const data = await res.json();
       setCompanies(data);
     } catch (err) {
@@ -51,7 +51,7 @@ export function SystemCompanies() {
       
       if (!res.ok) {
         const errData = await res.json();
-        throw new Error(errData.message || 'Failed to register');
+        throw new Error(errData.message || 'فشل في التسجيل');
       }
 
       setFormData({ companyName: '', ownerName: '', email: '', password: '' });
@@ -78,7 +78,7 @@ export function SystemCompanies() {
         body: JSON.stringify({ status: newStatus })
       });
       
-      if (!res.ok) throw new Error('Failed to update status');
+      if (!res.ok) throw new Error('فشل في تحديث الحالة');
 
       addToast({ title: newStatus === 'ACTIVE' ? 'تم تفعيل الشركة' : 'تم إيقاف الشركة', type: 'success' });
       fetchCompanies();

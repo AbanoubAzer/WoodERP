@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { CalendarClock, Save, Calculator } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from '../../../store/toastStore';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 import { QuickAddCustomerModal } from '../../../components/ui/QuickAddCustomerModal';
 import { QuickAddSupplierModal } from '../../../components/ui/QuickAddSupplierModal';
@@ -77,7 +78,7 @@ export function NewInstallmentPlan() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if ((type === 'CUSTOMER' && !customerId) || (type === 'SUPPLIER' && !supplierId) || generatedSchedule.length === 0) return alert('الرجاء اختيار العميل/المورد وتوليد الجدول أولاً');
+    if ((type === 'CUSTOMER' && !customerId) || (type === 'SUPPLIER' && !supplierId) || generatedSchedule.length === 0) return toast.error('الرجاء اختيار العميل/المورد وتوليد الجدول أولاً');
 
     const sum = generatedSchedule.reduce((a, b) => a + b.amount, 0);
     if (Math.abs(sum - Number(totalAmount)) > 1) {
@@ -105,11 +106,11 @@ export function NewInstallmentPlan() {
 
       if (!response.ok) throw new Error('حدث خطأ أثناء إنشاء الخطة');
 
-      alert('تم إنشاء خطة التقسيط بنجاح!');
+      toast.success('تم إنشاء خطة التقسيط بنجاح!');
       navigate('/installments');
     } catch (err: any) {
       console.error(err);
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

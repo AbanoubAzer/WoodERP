@@ -1,4 +1,9 @@
-import { Controller, Get, UseGuards, UseInterceptors, Param, Query } from '@nestjs/common';
+import { Controller, Get, UseGuards, UseInterceptors,  Param,
+  Query,
+  Post,
+  Body,
+  Delete,
+} from '@nestjs/common';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -39,6 +44,35 @@ export class ReportsController {
     return this.reportsService.getInventoryReports(companyId);
   }
 
+  @Get('installments')
+  getInstallmentReports(@CurrentTenant() companyId: string) {
+    return this.reportsService.getInstallmentReports(companyId);
+  }
+
+  @Get('profiles')
+  getReportProfiles(
+    @CurrentTenant() companyId: string,
+    @Query('type') type?: string,
+  ) {
+    return this.reportsService.getReportProfiles(companyId, type);
+  }
+
+  @Post('profiles')
+  saveReportProfile(
+    @CurrentTenant() companyId: string,
+    @Body() data: any,
+  ) {
+    return this.reportsService.saveReportProfile(companyId, data);
+  }
+
+  @Delete('profiles/:id')
+  deleteReportProfile(
+    @CurrentTenant() companyId: string,
+    @Param('id') id: string,
+  ) {
+    return this.reportsService.deleteReportProfile(companyId, id);
+  }
+
   @Get('customers')
   getCustomerReports(@CurrentTenant() companyId: string) {
     return this.reportsService.getCustomerReports(companyId);
@@ -52,5 +86,33 @@ export class ReportsController {
   @Get('customers/:id/statement')
   getCustomerStatement(@CurrentTenant() companyId: string, @Param('id') customerId: string) {
     return this.reportsService.getCustomerStatement(companyId, customerId);
+  }
+
+  @Get('sales')
+  getSalesReport(
+    @CurrentTenant() companyId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getSalesReport(companyId, startDate, endDate);
+  }
+
+  @Get('inventory-movements')
+  getInventoryMovementsReport(
+    @CurrentTenant() companyId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getInventoryMovementsReport(companyId, startDate, endDate);
+  }
+
+  @Get('inventory-movements/:variantId')
+  getItemLedgerReport(
+    @CurrentTenant() companyId: string,
+    @Param('variantId') variantId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportsService.getItemLedgerReport(companyId, variantId, startDate, endDate);
   }
 }

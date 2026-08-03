@@ -16,3 +16,30 @@
     @apply font-sans bg-[var(--color-brand-bg)] text-slate-800 antialiased;
   }
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 1cm;
+  }
+  
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+  }
+
+  /* Force absolute hiding of layout containers if they interfere */
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .print\:w-full {
+    width: 100% !important;
+  }
+
+  /* Remove scrollbars in print */
+  * {
+    overflow: visible !important;
+  }
+}

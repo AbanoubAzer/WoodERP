@@ -3,6 +3,7 @@ import { useAuthStore } from '../../../store/authStore';
 import { Wallet, Plus, Building2, Landmark, ArrowLeftRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { toast } from '../../../store/toastStore';
 
 export function TreasuryAccounts() {
   const token = useAuthStore(state => state.token);
@@ -53,7 +54,7 @@ export function TreasuryAccounts() {
       setShowModal(false);
       fetchData();
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

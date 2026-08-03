@@ -7,26 +7,26 @@ export class WoodTypesService {
 
   create(companyId: string, data: any) {
     return this.prisma.woodType.create({
-      data: { ...data, companyId }
+      data: { ...data, companyId },
     });
   }
 
   findAll(companyId: string) {
     return this.prisma.woodType.findMany({
-      where: { companyId }
+      where: { companyId },
     });
   }
 
   update(companyId: string, id: string, data: any) {
     return this.prisma.woodType.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.woodType.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }

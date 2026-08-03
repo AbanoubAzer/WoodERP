@@ -5,10 +5,13 @@ import { Link } from 'react-router-dom';
 import { TableSkeleton } from '../../../components/ui/Skeleton';
 import { Pagination } from '../../../components/ui/Pagination';
 import { toast } from '../../../store/toastStore';
+import { SearchableSelect } from '../../../components/ui/SearchableSelect';
 
 export function Inventory() {
   const token = useAuthStore(state => state.token);
   const [stock, setStock] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -16,7 +19,18 @@ export function Inventory() {
 
   useEffect(() => {
     fetchStock();
+    fetchWarehouses();
   }, []);
+
+  const fetchWarehouses = async () => {
+    try {
+      const res = await fetch('/api/warehouses', { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      setWarehouses(data);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchStock = async () => {
     try {
@@ -59,10 +73,12 @@ export function Inventory() {
     toast.success('تم تصدير البيانات بنجاح');
   };
 
-  const filteredStock = stock.filter(item => 
-    (item.variant?.product?.name?.toLowerCase()?.includes(searchTerm.toLowerCase())) ||
-    (item.warehouse?.name?.toLowerCase()?.includes(searchTerm.toLowerCase()))
-  );
+  const filteredStock = stock.filter(item => {
+    const matchesSearch = (item.variant?.product?.name?.toLowerCase()?.includes(searchTerm.toLowerCase())) ||
+                          (item.warehouse?.name?.toLowerCase()?.includes(searchTerm.toLowerCase()));
+    const matchesWarehouse = selectedWarehouseId ? item.warehouseId === selectedWarehouseId : true;
+    return matchesSearch && matchesWarehouse;
+  });
 
   const totalPages = Math.ceil(filteredStock.length / itemsPerPage);
   const paginatedStock = filteredStock.slice(
@@ -97,15 +113,27 @@ export function Inventory() {
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden p-6">
-        <div className="relative mb-6">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-          <input 
-            type="text" 
-            placeholder="بحث في المخزون (صنف، مقاس، مخزن)..." 
-            value={searchTerm}
-            onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            className="w-full pl-4 pr-10 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-[var(--color-brand-primary)]/20"
-          />
+        <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+            <input 
+              type="text" 
+              placeholder="بحث في المخزون (صنف، مقاس، مخزن)..." 
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+              className="w-full pl-4 pr-10 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-[var(--color-brand-primary)]/20"
+            />
+          </div>
+          {warehouses.length > 1 && (
+            <div className="w-full md:w-64">
+              <SearchableSelect
+                options={[{ value: '', label: 'كافة المخازن' }, ...warehouses.map(w => ({ value: w.id, label: w.name }))]}
+                value={selectedWarehouseId}
+                onChange={(val) => { setSelectedWarehouseId(val); setCurrentPage(1); }}
+                placeholder="تصفية بالمخزن..."
+              />
+            </div>
+          )}
         </div>
 
         {loading ? (

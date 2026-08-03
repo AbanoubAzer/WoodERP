@@ -7,13 +7,13 @@ export class CompanySettingsService {
 
   async findOne(companyId: string) {
     let settings = await this.prisma.companySetting.findUnique({
-      where: { companyId }
+      where: { companyId },
     });
 
     // Auto-create defaults if they don't exist yet
     if (!settings) {
       settings = await this.prisma.companySetting.create({
-        data: { companyId }
+        data: { companyId },
       });
     }
     return settings;
@@ -22,7 +22,7 @@ export class CompanySettingsService {
   update(companyId: string, data: any) {
     return this.prisma.companySetting.update({
       where: { companyId },
-      data
+      data,
     });
   }
 }

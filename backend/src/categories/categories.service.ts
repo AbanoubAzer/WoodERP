@@ -7,27 +7,27 @@ export class CategoriesService {
 
   create(companyId: string, data: any) {
     return this.prisma.category.create({
-      data: { ...data, companyId }
+      data: { ...data, companyId },
     });
   }
 
   findAll(companyId: string) {
     return this.prisma.category.findMany({
       where: { companyId },
-      include: { parent: true, children: true }
+      include: { parent: true, children: true },
     });
   }
 
   update(companyId: string, id: string, data: any) {
     return this.prisma.category.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.category.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }

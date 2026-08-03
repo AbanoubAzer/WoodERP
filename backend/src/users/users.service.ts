@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
@@ -8,9 +12,10 @@ export class UsersService {
 
   async create(companyId: string, data: any) {
     const { email, password, branchIds, ...rest } = data;
-    
+
     const existing = await this.prisma.user.findFirst({ where: { email } });
-    if (existing) throw new ConflictException('Email already in use');
+    if (existing)
+      throw new ConflictException('البريد الإلكتروني مستخدم بالفعل');
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -20,14 +25,16 @@ export class UsersService {
         email,
         passwordHash: hashedPassword,
         ...rest,
-        branches: branchIds ? {
-          connect: branchIds.map((id: string) => ({ id }))
-        } : undefined
+        branches: branchIds
+          ? {
+              connect: branchIds.map((id: string) => ({ id })),
+            }
+          : undefined,
       },
       include: {
         role: true,
-        branches: true
-      }
+        branches: true,
+      },
     });
   }
 
@@ -36,17 +43,17 @@ export class UsersService {
       where: { companyId },
       include: {
         role: true,
-        branches: true
-      }
+        branches: true,
+      },
     });
   }
 
   async findOne(companyId: string, id: string) {
     const user = await this.prisma.user.findFirst({
       where: { id, companyId },
-      include: { role: true, branches: true }
+      include: { role: true, branches: true },
     });
-    if (!user) throw new NotFoundException('User not found');
+    if (!user) throw new NotFoundException('المستخدم غير موجود');
     return user;
   }
 
@@ -54,7 +61,7 @@ export class UsersService {
     await this.findOne(companyId, id);
     const { branchIds, password, ...rest } = data;
 
-    let updateData: any = { ...rest };
+    const updateData: any = { ...rest };
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
@@ -63,9 +70,11 @@ export class UsersService {
       where: { id },
       data: {
         ...updateData,
-        branches: branchIds ? {
-          set: branchIds.map((id: string) => ({ id }))
-        } : undefined
+        branches: branchIds
+          ? {
+              set: branchIds.map((id: string) => ({ id })),
+            }
+          : undefined,
       },
     });
   }

@@ -9,14 +9,14 @@ export class NotificationsService {
     return this.prisma.notification.findMany({
       where: { companyId, userId },
       orderBy: { createdAt: 'desc' },
-      take: 50
+      take: 50,
     });
   }
 
   markAsRead(id: string, companyId: string, userId: string) {
     return this.prisma.notification.updateMany({
       where: { id, companyId, userId },
-      data: { isRead: true }
+      data: { isRead: true },
     });
   }
 
@@ -24,20 +24,22 @@ export class NotificationsService {
     // 1. Find all items with stock below their minimum level
     const lowStockItems = await this.prisma.inventoryStock.findMany({
       where: { companyId, physicalQty: { lt: 10 } }, // Assuming 10 is the hardcoded min for this MVP
-      include: { 
-        variant: { include: { product: true } }, 
-        warehouse: { include: { branch: true } } 
-      }
+      include: {
+        variant: { include: { product: true } },
+        warehouse: { include: { branch: true } },
+      },
     });
 
-    if (lowStockItems.length === 0) return { message: 'No low stock items found.' };
+    if (lowStockItems.length === 0)
+      return { message: 'No low stock items found.' };
 
     // 2. Find all warehouse managers for this company
     const managers = await this.prisma.user.findMany({
-      where: { companyId, role: { name: 'WAREHOUSE_MANAGER' } }
+      where: { companyId, role: { name: 'WAREHOUSE_MANAGER' } },
     });
 
-    if (managers.length === 0) return { message: 'No warehouse managers to notify.' };
+    if (managers.length === 0)
+      return { message: 'No warehouse managers to notify.' };
 
     let createdCount = 0;
 
@@ -46,12 +48,12 @@ export class NotificationsService {
       for (const manager of managers) {
         // Check if an unread notification already exists to avoid spam
         const existing = await this.prisma.notification.findFirst({
-          where: { 
-            companyId, 
-            userId: manager.id, 
+          where: {
+            companyId,
+            userId: manager.id,
             relatedEntityId: item.id,
-            isRead: false
-          }
+            isRead: false,
+          },
         });
 
         if (!existing) {
@@ -62,8 +64,8 @@ export class NotificationsService {
               title: 'تنبيه نقص مخزون',
               message: `المنتج ${item.variant.product.name} وصل إلى الحد الأدنى للمخزون في فرع ${item.warehouse.branch.name}. الكمية الحالية: ${item.physicalQty}`,
               type: 'WARNING',
-              relatedEntityId: item.id
-            }
+              relatedEntityId: item.id,
+            },
           });
           createdCount++;
         }

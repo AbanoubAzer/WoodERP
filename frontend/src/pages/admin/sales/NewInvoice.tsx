@@ -21,6 +21,10 @@ export function NewInvoice() {
   const [amountPaid, setAmountPaid] = useState(0);
   const [treasuryAccountId, setTreasuryAccountId] = useState('');
   
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [paymentReference, setPaymentReference] = useState('');
+  
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   
@@ -68,12 +72,35 @@ export function NewInvoice() {
     fetchInventory();
     fetchTreasuryAccounts();
     fetchWarehouses();
+    fetchPaymentMethods();
   }, []);
+
+  const fetchPaymentMethods = async () => {
+    try {
+      const res = await fetch('/api/payment-methods', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const active = data.filter((m: any) => m.isActive);
+        setPaymentMethods(active);
+        if (active.length > 0) {
+          setPaymentMethodId(active[0].id);
+        }
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchWarehouses = async () => {
     try {
       const res = await fetch('/api/warehouses', { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setWarehouses(await res.json());
+      if (res.ok) {
+        const data = await res.json();
+        setWarehouses(data);
+        if (data.length === 1) {
+          setWarehouseId(data[0].id);
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -158,6 +185,8 @@ export function NewInvoice() {
           discount,
           amountPaid,
           treasuryAccountId,
+          paymentMethodId,
+          paymentReference,
           createInstallments,
           installmentsCount,
           interestRate,
@@ -221,12 +250,18 @@ export function NewInvoice() {
             
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-2">اختر المخزن (للفاتورة ككل)</label>
-              <SearchableSelect
-                options={warehouses.map(w => ({ value: w.id, label: w.name }))}
-                value={warehouseId}
-                onChange={setWarehouseId}
-                placeholder="-- اختر المخزن (اختياري) --"
-              />
+              {warehouses.length === 1 ? (
+                <div className="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-slate-700 font-semibold cursor-not-allowed">
+                  {warehouses[0].name}
+                </div>
+              ) : (
+                <SearchableSelect
+                  options={warehouses.map(w => ({ value: w.id, label: w.name }))}
+                  value={warehouseId}
+                  onChange={setWarehouseId}
+                  placeholder="-- اختر المخزن (اختياري) --"
+                />
+              )}
             </div>
           </div>
 
@@ -299,15 +334,43 @@ export function NewInvoice() {
                   <input type="number" min="0" step="any" max={totalAmount} value={amountPaid} onChange={e => setAmountPaid(Number(e.target.value))} className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 bg-white" />
                 </div>
                 {amountPaid > 0 && (
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2">حساب الخزينة / البنك</label>
-                    <SearchableSelect
-                      options={treasuryAccounts.map(t => ({ value: t.id, label: `${t.name} (الرصيد: ${t.balance})` }))}
-                      value={treasuryAccountId}
-                      onChange={setTreasuryAccountId}
-                      placeholder="اختر الخزينة..."
-                    />
-                  </div>
+                  <>
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة الدفع</label>
+                      <select
+                        value={paymentMethodId}
+                        onChange={(e) => setPaymentMethodId(e.target.value)}
+                        className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 bg-white"
+                      >
+                        {paymentMethods.map(m => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {paymentMethods.find(m => m.id === paymentMethodId)?.requiresReference && (
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">رقم المرجع (التحويل/المحفظة)</label>
+                        <input
+                          type="text"
+                          value={paymentReference}
+                          onChange={(e) => setPaymentReference(e.target.value)}
+                          className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 bg-white"
+                          placeholder="مثال: رقم تحويل InstaPay"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">حساب الخزينة / البنك</label>
+                      <SearchableSelect
+                        options={treasuryAccounts.map(t => ({ value: t.id, label: `${t.name} (الرصيد: ${t.balance})` }))}
+                        value={treasuryAccountId}
+                        onChange={setTreasuryAccountId}
+                        placeholder="اختر الخزينة..."
+                      />
+                    </div>
+                  </>
                 )}
               </div>
               
@@ -351,10 +414,11 @@ export function NewInvoice() {
                                   <td className="p-2">
                                     <input 
                                       type="date" 
-                                      value={inst.dueDate} 
+                                      value={inst.dueDate || ''} 
                                       onChange={e => updateCustomInstallment(idx, 'dueDate', e.target.value)}
                                       className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-emerald-500/20"
                                     />
+                                    {!inst.dueDate && <span className="text-[10px] text-amber-600 block mt-1">بدون تاريخ (مفتوح)</span>}
                                   </td>
                                   <td className="p-2">
                                     <input 

@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards, UseInterceptors } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -26,7 +35,11 @@ export class UsersController {
   }
 
   @Patch(':id')
-  update(@CurrentTenant() companyId: string, @Param('id') id: string, @Body() data: any) {
+  update(
+    @CurrentTenant() companyId: string,
+    @Param('id') id: string,
+    @Body() data: any,
+  ) {
     return this.usersService.update(companyId, id, data);
   }
 

@@ -15,6 +15,7 @@ import { Roles } from './pages/admin/Roles';
 import { Categories } from './pages/admin/catalog/Categories';
 import { WoodTypes } from './pages/admin/catalog/WoodTypes';
 import { Products } from './pages/admin/catalog/Products';
+import { NewProduct } from './pages/admin/catalog/NewProduct';
 import { Warehouses } from './pages/admin/inventory/Warehouses';
 import { Inventory } from './pages/admin/inventory/Inventory';
 import { ReceiveStock } from './pages/admin/inventory/ReceiveStock';
@@ -43,6 +44,10 @@ import { TreasuryTransfer } from './pages/admin/treasury/TreasuryTransfer';
 import { NotificationsList } from './pages/admin/notifications/NotificationsList';
 import { SalesReports } from './pages/admin/reports/SalesReports';
 import { AgingReports } from './pages/admin/reports/AgingReports';
+import { ComprehensiveCustomerReport } from './pages/admin/reports/ComprehensiveCustomerReport';
+import { SalesDateRangeReport } from './pages/admin/reports/SalesDateRangeReport';
+import { InventoryMovementsReport } from './pages/admin/reports/InventoryMovementsReport';
+import { PaymentMethodsSettings } from './pages/admin/settings/PaymentMethodsSettings';
 import { SystemCompanies } from './pages/system/SystemCompanies';
 
 // Protected Route Wrapper
@@ -65,18 +70,25 @@ function App() {
           <Route path="branches" element={<Branches />} />
           <Route path="users" element={<Users />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="payment-methods" element={<PaymentMethodsSettings />} />
           <Route path="roles" element={<Roles />} />
           <Route path="categories" element={<Categories />} />
           <Route path="wood-types" element={<WoodTypes />} />
           <Route path="products" element={<Products />} />
+          <Route path="products/new" element={<NewProduct />} />
           <Route path="warehouses" element={<Warehouses />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="inventory/receive" element={<ReceiveStock />} />
           <Route path="inventory/issue" element={<IssueStock />} />
           <Route path="inventory/transfer" element={<StockTransfer />} />
           <Route path="reports">
+            <Route index element={<Navigate to="inventory" replace />} />
+            <Route path="inventory" element={<InventoryReports />} />
+            <Route path="inventory-movements" element={<InventoryMovementsReport />} />
             <Route path="sales" element={<SalesReports />} />
+            <Route path="sales-advanced" element={<SalesDateRangeReport />} />
             <Route path="aging" element={<AgingReports />} />
+            <Route path="customers" element={<ComprehensiveCustomerReport />} />
           </Route>
           <Route path="customers" element={<Customers />} />
           <Route path="customers/new" element={<NewCustomer />} />

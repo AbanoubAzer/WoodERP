@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { Receipt, Plus } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { toast } from '../../../store/toastStore';
 
 export function Expenses() {
   const token = useAuthStore(state => state.token);
@@ -47,7 +48,7 @@ export function Expenses() {
       setAmount(''); setDescription('');
       fetchExpenses();
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

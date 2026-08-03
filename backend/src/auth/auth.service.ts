@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ConflictException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
@@ -7,7 +11,7 @@ import * as bcrypt from 'bcrypt';
 export class AuthService {
   constructor(
     private prisma: PrismaService,
-    private jwtService: JwtService
+    private jwtService: JwtService,
   ) {}
 
   async registerCompany(data: any) {
@@ -16,7 +20,7 @@ export class AuthService {
     // Check if email exists
     const existingUser = await this.prisma.user.findFirst({ where: { email } });
     if (existingUser) {
-      throw new ConflictException('Email already registered');
+      throw new ConflictException('البريد الإلكتروني مسجل بالفعل');
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
@@ -29,11 +33,11 @@ export class AuthService {
           name: companyName,
           code: companyCode,
           email: email,
-        }
+        },
       });
 
       await prisma.companySetting.create({
-        data: { companyId: company.id }
+        data: { companyId: company.id },
       });
 
       const role = await prisma.role.create({
@@ -42,7 +46,7 @@ export class AuthService {
           name: 'Owner',
           permissions: ['ALL'],
           isDefault: true,
-        }
+        },
       });
 
       const user = await prisma.user.create({
@@ -53,7 +57,7 @@ export class AuthService {
           name: ownerName,
           roleId: role.id,
           isOwner: true,
-        }
+        },
       });
 
       return { company, user };
@@ -62,38 +66,42 @@ export class AuthService {
     return {
       message: 'Company registered successfully',
       companyId: result.company.id,
-      userId: result.user.id
+      userId: result.user.id,
     };
   }
 
   async login(data: any) {
     const { email, password } = data;
-    const user = await this.prisma.user.findFirst({ 
+    const user = await this.prisma.user.findFirst({
       where: { email },
-      include: { company: true }
+      include: { company: true },
     });
 
     if (!user) {
       console.log('Login failed: User not found for email', email);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('بيانات الدخول غير صحيحة');
     }
 
     const isMatch = await bcrypt.compare(password, user.passwordHash);
     if (!isMatch) {
       console.log('Login failed: Password mismatch for user', email);
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('بيانات الدخول غير صحيحة');
     }
 
     if (user.status !== 'ACTIVE') {
       console.log('Login failed: User deactivated', email);
-      throw new UnauthorizedException('User account is deactivated');
+      throw new UnauthorizedException('حساب المستخدم معطل');
     }
 
     if (user.company.status !== 'ACTIVE') {
-      throw new UnauthorizedException('Company account is suspended');
+      throw new UnauthorizedException('حساب الشركة موقوف');
     }
 
-    const payload = { sub: user.id, email: user.email, companyId: user.companyId };
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      companyId: user.companyId,
+    };
     return {
       access_token: this.jwtService.sign(payload),
       user: {
@@ -101,24 +109,24 @@ export class AuthService {
         name: user.name,
         email: user.email,
         companyId: user.companyId,
-        isSuperAdmin: user.isSuperAdmin
-      }
+        isSuperAdmin: user.isSuperAdmin,
+      },
     };
   }
 
   async changePassword(userId: string, oldPass: string, newPass: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) throw new UnauthorizedException('User not found');
+    if (!user) throw new UnauthorizedException('المستخدم غير موجود');
 
     const isValid = await bcrypt.compare(oldPass, user.passwordHash);
     if (!isValid) {
-      throw new UnauthorizedException('Invalid old password');
+      throw new UnauthorizedException('كلمة المرور القديمة غير صحيحة');
     }
 
     const hashed = await bcrypt.hash(newPass, 10);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { passwordHash: hashed }
+      data: { passwordHash: hashed },
     });
 
     return { message: 'Password changed successfully' };

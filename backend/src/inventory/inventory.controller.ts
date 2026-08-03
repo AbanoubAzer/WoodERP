@@ -1,4 +1,10 @@
-import { Controller, Get, UseGuards, UseInterceptors, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  UseGuards,
+  UseInterceptors,
+  Query,
+} from '@nestjs/common';
 import { InventoryService } from './inventory.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
@@ -14,7 +20,7 @@ export class InventoryController {
   getBalance(
     @CurrentTenant() companyId: string,
     @Query('warehouseId') warehouseId?: string,
-    @Query('variantId') variantId?: string
+    @Query('variantId') variantId?: string,
   ) {
     return this.inventoryService.getBalance(companyId, warehouseId, variantId);
   }

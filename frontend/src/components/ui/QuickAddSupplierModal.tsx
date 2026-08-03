@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Save, Truck } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
+import { toast } from '../../store/toastStore';
 
 interface QuickAddSupplierModalProps {
   onClose: () => void;
@@ -36,11 +37,11 @@ export function QuickAddSupplierModal({ onClose, onSuccess }: QuickAddSupplierMo
         const newSupplier = await res.json();
         onSuccess(newSupplier);
       } else {
-        alert('حدث خطأ أثناء إضافة المورد');
+        toast.error('حدث خطأ أثناء إضافة المورد');
       }
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ أثناء إضافة المورد');
+      toast.error('حدث خطأ أثناء إضافة المورد');
     } finally {
       setLoading(false);
     }

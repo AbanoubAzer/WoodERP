@@ -1,4 +1,12 @@
-import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  UseGuards,
+} from '@nestjs/common';
 import { SystemService } from './system.service';
 import { AuthService } from '../auth/auth.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
@@ -9,7 +17,7 @@ import { SuperAdminGuard } from '../auth/super-admin.guard';
 export class SystemController {
   constructor(
     private readonly systemService: SystemService,
-    private readonly authService: AuthService
+    private readonly authService: AuthService,
   ) {}
 
   @Get()
@@ -23,7 +31,10 @@ export class SystemController {
   }
 
   @Patch(':id/status')
-  updateStatus(@Param('id') id: string, @Body('status') status: 'ACTIVE' | 'SUSPENDED') {
+  updateStatus(
+    @Param('id') id: string,
+    @Body('status') status: 'ACTIVE' | 'SUSPENDED',
+  ) {
     return this.systemService.updateCompanyStatus(id, status);
   }
 }

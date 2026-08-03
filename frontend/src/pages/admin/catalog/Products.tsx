@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { Box, Plus, Search } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export function Products() {
   const token = useAuthStore(state => state.token);
+  const navigate = useNavigate();
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,6 +41,7 @@ export function Products() {
           </div>
         </div>
         <button 
+          onClick={() => navigate('/products/new')}
           className="flex items-center space-x-2 space-x-reverse bg-[var(--color-brand-sidebar)] hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-semibold transition-colors"
         >
           <Plus size={20} />

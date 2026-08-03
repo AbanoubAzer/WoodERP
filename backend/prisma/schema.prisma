@@ -46,6 +46,8 @@ model Company {
   notifications    Notification[]
   customReports    CustomReport[]
   reportSchedules  ReportSchedule[]
+  reportProfiles   ReportProfile[]
+  paymentMethods   PaymentMethod[]
 }
 
 enum CompanyStatus {
@@ -128,18 +130,18 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  company           Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  role              Role?                 @relation(fields: [roleId], references: [id])
-  branches          Branch[]              @relation("UserBranches")
-  auditLogs         AuditLog[]
-  priceChanges      ProductPriceHistory[]
-  managedWarehouses Warehouse[]           @relation("WarehouseManager")
-  managedBranches   Branch[]              @relation("BranchManager")
-  stockMovements    StockMovement[]       @relation("MovementUser")
-  notifications     Notification[]
-  customReports     CustomReport[]
-  createdSalesInvoices    SalesInvoice[]    @relation("SalesCreator")
-  createdPurchaseInvoices PurchaseInvoice[] @relation("PurchaseCreator")
+  company                 Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role                    Role?                 @relation(fields: [roleId], references: [id])
+  branches                Branch[]              @relation("UserBranches")
+  auditLogs               AuditLog[]
+  priceChanges            ProductPriceHistory[]
+  managedWarehouses       Warehouse[]           @relation("WarehouseManager")
+  managedBranches         Branch[]              @relation("BranchManager")
+  stockMovements          StockMovement[]       @relation("MovementUser")
+  notifications           Notification[]
+  customReports           CustomReport[]
+  createdSalesInvoices    SalesInvoice[]        @relation("SalesCreator")
+  createdPurchaseInvoices PurchaseInvoice[]     @relation("PurchaseCreator")
 
   @@unique([companyId, email]) // Enforce unique email per tenant
 }
@@ -281,18 +283,18 @@ model Warehouse {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  branch        Branch                @relation(fields: [branchId], references: [id])
-  manager       User?                 @relation("WarehouseManager", fields: [managerId], references: [id])
-  locations     StorageLocation[]
-  stock         InventoryStock[]
-  movementsFrom StockMovement[]       @relation("MovementFromWarehouse")
-  movementsTo   StockMovement[]       @relation("MovementToWarehouse")
-  salesItems    SalesInvoiceItem[]
-  purchaseItems PurchaseInvoiceItem[]
-  customers     Customer[]
-  suppliers     Supplier[]
-  salesInvoices SalesInvoice[]
+  company          Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  branch           Branch                @relation(fields: [branchId], references: [id])
+  manager          User?                 @relation("WarehouseManager", fields: [managerId], references: [id])
+  locations        StorageLocation[]
+  stock            InventoryStock[]
+  movementsFrom    StockMovement[]       @relation("MovementFromWarehouse")
+  movementsTo      StockMovement[]       @relation("MovementToWarehouse")
+  salesItems       SalesInvoiceItem[]
+  purchaseItems    PurchaseInvoiceItem[]
+  customers        Customer[]
+  suppliers        Supplier[]
+  salesInvoices    SalesInvoice[]
   purchaseInvoices PurchaseInvoice[]
 }
 
@@ -354,13 +356,13 @@ model Customer {
   companyId   String
   warehouseId String?
   code        String
-  name      String
-  phone     String?
-  email     String?
-  address   String?
-  city      String?
-  country   String?
-  notes     String? @db.Text
+  name        String
+  phone       String?
+  email       String?
+  address     String?
+  city        String?
+  country     String?
+  notes       String? @db.Text
 
   // Business Info
   companyName   String?
@@ -387,27 +389,32 @@ model Customer {
 }
 
 model CustomerTransaction {
-  id             String   @id @default(uuid())
-  customerId     String
-  type           String // DEBIT (increases debt), CREDIT (decreases debt)
-  amount         Float
-  runningBalance Float // Snapshot of balance after this transaction
-  referenceId    String? // Invoice ID, Receipt ID
-  reason         String? // "Opening Balance", "Sales Invoice #123"
-  date           DateTime @default(now())
+  id               String   @id @default(uuid())
+  customerId       String
+  type             String // DEBIT (increases debt), CREDIT (decreases debt)
+  amount           Float
+  runningBalance   Float // Snapshot of balance after this transaction
+  referenceId      String? // Invoice ID, Receipt ID
+  reason           String? // "Opening Balance", "Sales Invoice #123"
+  paymentMethodId  String?
+  paymentReference String?
+  date             DateTime @default(now())
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 }
 
 model CustomerPayment {
-  id          String   @id @default(uuid())
-  customerId  String
-  amount      Float
-  method      String // CASH, BANK_TRANSFER, CHEQUE
-  referenceId String? // Bank receipt number, Cheque number
-  date        DateTime @default(now())
+  id              String   @id @default(uuid())
+  customerId      String
+  amount          Float
+  method          String // CASH, BANK_TRANSFER, CHEQUE
+  paymentMethodId String?
+  referenceId     String? // Bank receipt number, Cheque number
+  date            DateTime @default(now())
 
-  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer      Customer       @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 }
 
 // -----------------------------------------------------------------------------
@@ -451,27 +458,32 @@ model Supplier {
 }
 
 model SupplierTransaction {
-  id             String   @id @default(uuid())
-  supplierId     String
-  type           String // PURCHASE (increases debt), PAYMENT/RETURN (decreases debt)
-  amount         Float
-  runningBalance Float // Snapshot of balance after this transaction
-  referenceId    String? // Invoice ID, Receipt ID
-  reason         String? // "Opening Balance", "Purchase Invoice #123"
-  date           DateTime @default(now())
+  id               String   @id @default(uuid())
+  supplierId       String
+  type             String // PURCHASE (increases debt), PAYMENT/RETURN (decreases debt)
+  amount           Float
+  runningBalance   Float // Snapshot of balance after this transaction
+  referenceId      String? // Invoice ID, Receipt ID
+  reason           String? // "Opening Balance", "Purchase Invoice #123"
+  paymentMethodId  String?
+  paymentReference String?
+  date             DateTime @default(now())
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier      Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 }
 
 model SupplierPayment {
-  id          String   @id @default(uuid())
-  supplierId  String
-  amount      Float
-  method      String // CASH, BANK_TRANSFER, CHEQUE
-  referenceId String? // Bank receipt number, Cheque number
-  date        DateTime @default(now())
+  id              String   @id @default(uuid())
+  supplierId      String
+  amount          Float
+  method          String // CASH, BANK_TRANSFER, CHEQUE
+  paymentMethodId String?
+  referenceId     String? // Bank receipt number, Cheque number
+  date            DateTime @default(now())
 
-  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  supplier      Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
 }
 
 // -----------------------------------------------------------------------------
@@ -479,18 +491,20 @@ model SupplierPayment {
 // -----------------------------------------------------------------------------
 
 model SalesInvoice {
-  id            String @id @default(uuid())
+  id            String  @id @default(uuid())
   companyId     String
   warehouseId   String?
   customerId    String
   invoiceNumber String // e.g. INV-2026-08-0001
-  status        String @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+  status        String  @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
 
-  subtotal    Float @default(0)
-  discount    Float @default(0)
-  taxAmount   Float @default(0)
-  totalAmount Float @default(0)
-  amountPaid  Float @default(0)
+  subtotal         Float   @default(0)
+  discount         Float   @default(0)
+  taxAmount        Float   @default(0)
+  totalAmount      Float   @default(0)
+  amountPaid       Float   @default(0)
+  paymentMethodId  String?
+  paymentReference String?
 
   notes       String?
   issuedAt    DateTime @default(now())
@@ -498,11 +512,12 @@ model SalesInvoice {
   updatedAt   DateTime @updatedAt
   createdById String?
 
-  company   Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  warehouse Warehouse?         @relation(fields: [warehouseId], references: [id])
-  customer  Customer           @relation(fields: [customerId], references: [id])
-  createdBy User?              @relation("SalesCreator", fields: [createdById], references: [id])
-  items     SalesInvoiceItem[]
+  company       Company            @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse     Warehouse?         @relation(fields: [warehouseId], references: [id])
+  customer      Customer           @relation(fields: [customerId], references: [id])
+  createdBy     User?              @relation("SalesCreator", fields: [createdById], references: [id])
+  paymentMethod PaymentMethod?     @relation(fields: [paymentMethodId], references: [id])
+  items         SalesInvoiceItem[]
 
   @@unique([companyId, invoiceNumber])
 }
@@ -526,18 +541,20 @@ model SalesInvoiceItem {
 // -----------------------------------------------------------------------------
 
 model PurchaseInvoice {
-  id            String @id @default(uuid())
+  id            String  @id @default(uuid())
   companyId     String
   warehouseId   String?
   supplierId    String
   invoiceNumber String // The system generated or manually entered supplier invoice number
-  status        String @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
+  status        String  @default("COMPLETED") // PENDING, COMPLETED, CANCELLED
 
-  subtotal    Float @default(0)
-  discount    Float @default(0)
-  taxAmount   Float @default(0)
-  totalAmount Float @default(0)
-  amountPaid  Float @default(0)
+  subtotal         Float   @default(0)
+  discount         Float   @default(0)
+  taxAmount        Float   @default(0)
+  totalAmount      Float   @default(0)
+  amountPaid       Float   @default(0)
+  paymentMethodId  String?
+  paymentReference String?
 
   notes       String?
   issuedAt    DateTime @default(now())
@@ -545,11 +562,12 @@ model PurchaseInvoice {
   updatedAt   DateTime @updatedAt
   createdById String?
 
-  company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  warehouse Warehouse?            @relation(fields: [warehouseId], references: [id])
-  supplier  Supplier              @relation(fields: [supplierId], references: [id])
-  createdBy User?                 @relation("PurchaseCreator", fields: [createdById], references: [id])
-  items     PurchaseInvoiceItem[]
+  company       Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  warehouse     Warehouse?            @relation(fields: [warehouseId], references: [id])
+  supplier      Supplier              @relation(fields: [supplierId], references: [id])
+  createdBy     User?                 @relation("PurchaseCreator", fields: [createdById], references: [id])
+  paymentMethod PaymentMethod?        @relation(fields: [paymentMethodId], references: [id])
+  items         PurchaseInvoiceItem[]
 
   @@unique([companyId, invoiceNumber])
 }
@@ -573,7 +591,7 @@ model PurchaseInvoiceItem {
 // -----------------------------------------------------------------------------
 
 model InstallmentPlan {
-  id         String @id @default(uuid())
+  id         String  @id @default(uuid())
   companyId  String
   customerId String?
   supplierId String?
@@ -601,10 +619,10 @@ model Installment {
   planId String
 
   installmentNumber Int
-  dueDate           DateTime
+  dueDate           DateTime?
   amount            Float
-  paidAmount        Float    @default(0)
-  status            String   @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE
+  paidAmount        Float     @default(0)
+  status            String    @default("PENDING") // PENDING, PARTIAL, PAID, OVERDUE
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -778,4 +796,46 @@ model ReportSchedule {
   updatedAt DateTime @updatedAt
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC: Reporting & Profiles
+// -----------------------------------------------------------------------------
+
+model ReportProfile {
+  id        String   @id @default(uuid())
+  companyId String
+  name      String
+  type      String   @default("CUSTOMER_ORDER")
+  data      Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+}
+
+// -----------------------------------------------------------------------------
+// EPIC X: Payment Methods
+// -----------------------------------------------------------------------------
+
+model PaymentMethod {
+  id                String  @id @default(uuid())
+  companyId         String
+  name              String // e.g. "InstaPay", "Bank Ahly", "Cash"
+  type              String  @default("CASH") // CASH, BANK_TRANSFER, DIGITAL_WALLET, CHEQUE
+  isActive          Boolean @default(true)
+  requiresReference Boolean @default(false)
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customerPayments     CustomerPayment[]
+  supplierPayments     SupplierPayment[]
+  salesInvoices        SalesInvoice[]
+  purchaseInvoices     PurchaseInvoice[]
+  customerTransactions CustomerTransaction[]
+  supplierTransactions SupplierTransaction[]
+
+  @@unique([companyId, name])
 }

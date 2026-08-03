@@ -23,7 +23,8 @@ import {
   BookOpen,
   Wallet,
   BarChart3,
-  ChevronDown
+  ChevronDown,
+  CreditCard
 } from 'lucide-react';
 
 interface MenuItem {
@@ -89,8 +90,11 @@ const menuGroups: { title: string; items: MenuItem[] }[] = [
         label: 'التقارير والإحصائيات', 
         path: '/reports',
         subItems: [
+          { label: 'حركة المخزون الشاملة', path: '/reports/inventory-movements' },
           { label: 'المبيعات والأرباح', path: '/reports/sales' },
+          { label: 'تقرير المبيعات المتقدم', path: '/reports/sales-advanced' },
           { label: 'أعمار الديون (AR/AP)', path: '/reports/aging' },
+          { label: 'تقرير العملاء الشامل', path: '/reports/customers' },
         ]
       },
     ]
@@ -101,6 +105,7 @@ const menuGroups: { title: string; items: MenuItem[] }[] = [
       { icon: Building2, label: 'الفروع', path: '/branches' },
       { icon: Users, label: 'المستخدمين', path: '/users' },
       { icon: Shield, label: 'الصلاحيات والأدوار', path: '/roles' },
+      { icon: CreditCard, label: 'طرق السداد', path: '/payment-methods' },
       { icon: Settings, label: 'إعدادات الشركة', path: '/settings' }
     ]
   }

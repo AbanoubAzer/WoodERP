@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
 import { BookOpen, Plus, Save } from 'lucide-react';
 import { SearchableSelect } from '../../../components/ui/SearchableSelect';
+import { toast } from '../../../store/toastStore';
 
 export function JournalEntries() {
   const token = useAuthStore(state => state.token);
@@ -61,7 +62,7 @@ export function JournalEntries() {
       setDescription('');
       fetchEntries();
     } catch (err: any) {
-      alert(err.message);
+      toast.error(err.message);
     }
   };
 

@@ -7,17 +7,18 @@ export class ProductsService {
 
   async create(companyId: string, data: any) {
     // If variants are provided, we should calculate their volumes before saving
-    const variantsData = data.variants?.map(v => {
-      // Auto calculate volume (Length * Width * Thickness) if dimensions exist
-      if (v.length && v.width && v.thickness) {
-        // Assume mm, volume in m3: (L * W * T) / 1,000,000,000
-        v.volume = (v.length * v.width * v.thickness) / 1000000000;
-      }
-      return v;
-    }) || [];
+    const variantsData =
+      data.variants?.map((v) => {
+        // Auto calculate volume (Length * Width * Thickness) if dimensions exist
+        if (v.length && v.width && v.thickness) {
+          // Assume mm, volume in m3: (L * W * T) / 1,000,000,000
+          v.volume = (v.length * v.width * v.thickness) / 1000000000;
+        }
+        return v;
+      }) || [];
 
     return this.prisma.product.create({
-      data: { 
+      data: {
         name: data.name,
         categoryId: data.categoryId,
         woodTypeId: data.woodTypeId,
@@ -26,30 +27,30 @@ export class ProductsService {
         baseUnit: data.baseUnit,
         companyId,
         variants: {
-          create: variantsData
-        }
+          create: variantsData,
+        },
       },
-      include: { variants: true, category: true, woodType: true }
+      include: { variants: true, category: true, woodType: true },
     });
   }
 
   findAll(companyId: string) {
     return this.prisma.product.findMany({
       where: { companyId },
-      include: { variants: true, category: true, woodType: true }
+      include: { variants: true, category: true, woodType: true },
     });
   }
 
   update(companyId: string, id: string, data: any) {
     return this.prisma.product.updateMany({
       where: { id, companyId },
-      data
+      data,
     });
   }
 
   remove(companyId: string, id: string) {
     return this.prisma.product.deleteMany({
-      where: { id, companyId }
+      where: { id, companyId },
     });
   }
 }
