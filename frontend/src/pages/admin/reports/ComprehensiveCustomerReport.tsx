@@ -10,6 +10,7 @@ interface Customer {
   code: string;
   phone: string;
   city: string;
+  address?: string;
   category: string;
   balance: number;
 }

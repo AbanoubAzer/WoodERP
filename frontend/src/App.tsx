@@ -83,8 +83,8 @@ function App() {
           <Route path="inventory/issue" element={<IssueStock />} />
           <Route path="inventory/transfer" element={<StockTransfer />} />
           <Route path="reports">
-            <Route index element={<Navigate to="inventory" replace />} />
-            <Route path="inventory" element={<InventoryReports />} />
+            <Route index element={<Navigate to="inventory-movements" replace />} />
+            <Route path="inventory" element={<Navigate to="/reports/inventory-movements" replace />} />
             <Route path="inventory-movements" element={<InventoryMovementsReport />} />
             <Route path="customer-dispatch" element={<CustomerDispatchReport />} />
             <Route path="sales" element={<SalesReports />} />
