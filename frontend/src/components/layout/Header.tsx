@@ -96,8 +96,36 @@ export function Header() {
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${token}` } });
-      if (res.ok) setNotifications(await res.json());
+      const [notifRes, instRes] = await Promise.all([
+        fetch('/api/notifications', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/installments', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      
+      let items: any[] = [];
+      if (notifRes.ok) {
+        const notifData = await notifRes.json();
+        items = Array.isArray(notifData) ? notifData : notifData.data || [];
+      }
+
+      if (instRes.ok) {
+        const instData = await instRes.json();
+        const installmentsList = Array.isArray(instData) ? instData : instData.data || [];
+        const overdueOrUpcoming = installmentsList.filter((inst: any) => inst.status === 'OVERDUE' || (inst.status === 'PENDING' && inst.dueDate && new Date(inst.dueDate).getTime() - Date.now() < 7 * 86400000));
+        
+        overdueOrUpcoming.forEach((inst: any) => {
+          const isOverdue = inst.status === 'OVERDUE';
+          const name = inst.plan?.customer?.name || inst.plan?.supplier?.name || 'عميل/مورد';
+          items.push({
+            id: `inst-${inst.id}`,
+            title: isOverdue ? `قسط متأخر على ${name}` : `قسط مستحق قريباً على ${name}`,
+            message: `قسط رقم #${inst.installmentNumber} بقيمة ${inst.amount} ج.م (تاريخ: ${inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('ar-EG') : 'غير محدد'})`,
+            type: isOverdue ? 'ERROR' : 'WARNING',
+            link: '/installments'
+          });
+        });
+      }
+
+      setNotifications(items);
     } catch (e) {
       console.error(e);
     }

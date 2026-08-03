@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuthStore } from '../../../store/authStore';
-import { FileText, ArrowRight, Printer, Download } from 'lucide-react';
+import { FileText, ArrowRight, Printer, Download, PlusCircle, X, Calendar, Filter, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { useParams, Link } from 'react-router-dom';
 import { PageLoader } from '../../../components/ui/Spinner';
 import { toArabicDigits } from '../../../utils/numberUtils';
 import { downloadCSV } from '../../../utils/exportUtils';
+import { toast } from '../../../store/toastStore';
+import { PaymentMethodBadge } from '../../../components/ui/PaymentMethodBadge';
 
 export function CustomerStatement() {
   const { id } = useParams();
@@ -12,9 +14,70 @@ export function CustomerStatement() {
   const [statementData, setStatementData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Date Filter State
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
+  // Modal State for Direct Payment / Down Payment / Adjustment
+  const [showModal, setShowModal] = useState(false);
+  const [txType, setTxType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [treasuryAccountId, setTreasuryAccountId] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     fetchStatement();
+    fetchOptions();
   }, [id]);
+
+  const filteredStatement = useMemo(() => {
+    if (!statementData?.statement) return [];
+    return statementData.statement.filter((row: any) => {
+      const d = new Date(row.date);
+      if (startDate && d < new Date(startDate)) return false;
+      if (endDate && d > new Date(endDate + 'T23:59:59')) return false;
+      return true;
+    });
+  }, [statementData, startDate, endDate]);
+
+  const totalValue = useMemo(() => {
+    return filteredStatement.reduce((sum: number, r: any) => sum + (r.value || 0), 0);
+  }, [filteredStatement]);
+
+  const totalPayments = useMemo(() => {
+    return filteredStatement.reduce((sum: number, r: any) => sum + (r.payment || 0), 0);
+  }, [filteredStatement]);
+
+  const currentBalance = useMemo(() => {
+    if (filteredStatement.length === 0) return 0;
+    return filteredStatement[filteredStatement.length - 1].balance;
+  }, [filteredStatement]);
+
+  const fetchOptions = async () => {
+    try {
+      const [pmRes, trRes] = await Promise.all([
+        fetch('/api/payment-methods', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/treasury/accounts', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      if (pmRes.ok) {
+        const pmJson = await pmRes.json();
+        setPaymentMethods(Array.isArray(pmJson) ? pmJson : pmJson.data || []);
+        if (pmJson.length > 0) setPaymentMethodId(pmJson[0].id);
+      }
+      if (trRes.ok) {
+        const trJson = await trRes.json();
+        const accs = Array.isArray(trJson) ? trJson : trJson.data || [];
+        setTreasuryAccounts(accs);
+        if (accs.length > 0) setTreasuryAccountId(accs[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const fetchStatement = async () => {
     try {
@@ -27,6 +90,44 @@ export function CustomerStatement() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!amount || Number(amount) <= 0) {
+      toast.warning('يرجى إدخال مبلغ صحيح');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/customer-ledger/${id}/transaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: txType,
+          amount: Number(amount),
+          reason: reason || (txType === 'CREDIT' ? 'دفعة مقدمة / تحصيل' : 'تسوية رصيد (مدين)'),
+          paymentMethodId,
+          treasuryAccountId
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'فشلت عملية التسجيل');
+      }
+      toast.success('تم تسجل الحركة المالية بنجاح!');
+      setShowModal(false);
+      setAmount('');
+      setReason('');
+      fetchStatement();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء حفظ الحركة');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -50,6 +151,13 @@ export function CustomerStatement() {
           </div>
         </div>
         <div className="text-left flex items-center gap-3">
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center space-x-2 space-x-reverse bg-indigo-600 hover:bg-indigo-700 text-white px-5 py-3 rounded-xl font-bold transition-colors shadow-sm"
+          >
+            <PlusCircle size={18} />
+            <span>إضافة دفعة مقدمة / تسوية</span>
+          </button>
           <button 
             onClick={() => {
               const rows: (string | number)[][] = [
@@ -99,6 +207,82 @@ export function CustomerStatement() {
         </div>
       </div>
 
+      {/* KPI Cards: Hidden when printing */}
+      <div className="print:hidden grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-500 mb-1">إجمالي المبيعات / المسحوبات (مدين)</p>
+            <p className="text-2xl font-black text-rose-600">{toArabicDigits(totalValue.toLocaleString('ar-EG'))} ج.م</p>
+          </div>
+          <div className="bg-rose-50 p-3.5 rounded-xl text-rose-600">
+            <TrendingUp size={24} />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-500 mb-1">إجمالي التحصيلات والسدادات (دائن)</p>
+            <p className="text-2xl font-black text-emerald-600">{toArabicDigits(totalPayments.toLocaleString('ar-EG'))} ج.م</p>
+          </div>
+          <div className="bg-emerald-50 p-3.5 rounded-xl text-emerald-600">
+            <TrendingDown size={24} />
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-500 mb-1">صافي الدين المستحق الحالي</p>
+            <p className={`text-2xl font-black ${currentBalance > 0 ? 'text-amber-600' : 'text-slate-800'}`}>
+              {toArabicDigits(currentBalance.toLocaleString('ar-EG'))} ج.م
+            </p>
+          </div>
+          <div className="bg-amber-50 p-3.5 rounded-xl text-amber-600">
+            <DollarSign size={24} />
+          </div>
+        </div>
+      </div>
+
+      {/* Date Filter Bar: Hidden when printing */}
+      <div className="print:hidden bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-wrap items-center justify-between gap-4" dir="rtl">
+        <div className="flex items-center space-x-2 space-x-reverse text-slate-700 font-bold text-sm">
+          <Filter size={18} className="text-indigo-600" />
+          <span>تصفية كشف الحساب بالفترة الزمنية:</span>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-2 space-x-reverse bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <Calendar size={16} className="text-slate-400" />
+            <span className="text-xs text-slate-500 font-semibold">من:</span>
+            <input 
+              type="date" 
+              value={startDate} 
+              onChange={(e) => setStartDate(e.target.value)} 
+              className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center space-x-2 space-x-reverse bg-slate-50 px-3 py-2 rounded-xl border border-slate-200">
+            <Calendar size={16} className="text-slate-400" />
+            <span className="text-xs text-slate-500 font-semibold">إلى:</span>
+            <input 
+              type="date" 
+              value={endDate} 
+              onChange={(e) => setEndDate(e.target.value)} 
+              className="bg-transparent border-none text-xs font-bold text-slate-800 focus:outline-none"
+            />
+          </div>
+
+          {(startDate || endDate) && (
+            <button 
+              onClick={() => { setStartDate(''); setEndDate(''); }}
+              className="text-xs font-bold text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl transition-colors"
+            >
+              إلغاء التصفية
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Print Document Layout */}
       <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100 print:shadow-none print:border-none print:p-0 w-full" dir="rtl">
         
@@ -125,7 +309,7 @@ export function CustomerStatement() {
               </tr>
             </thead>
             <tbody>
-              {statementData.statement.map((row: any, idx: number) => {
+              {filteredStatement.map((row: any, idx: number) => {
                 const hasItems = row.items && row.items.length > 0;
                 
                 if (hasItems) {
@@ -145,14 +329,7 @@ export function CustomerStatement() {
                         </td>
                         <td className="border border-slate-400 px-3 py-2 text-center text-xs font-semibold">
                           {isFirst ? (
-                            row.paymentMethodName ? (
-                              <div>
-                                <div className="font-bold text-slate-800">{row.paymentMethodName}</div>
-                                {row.paymentReference && <div className="text-slate-500 font-mono text-[10px]">{toArabicDigits(row.paymentReference)}</div>}
-                              </div>
-                            ) : (
-                              <span className="text-slate-500">{row.payment > 0 ? 'نقدي / تحصيل' : 'آجل / تقسيط'}</span>
-                            )
+                            <PaymentMethodBadge name={row.paymentMethodName} isPayment={row.payment > 0} />
                           ) : ''}
                         </td>
                         <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-50">
@@ -170,15 +347,8 @@ export function CustomerStatement() {
                       <td className="border border-slate-400 px-3 py-2 text-center">-</td>
                       <td className="border border-slate-400 px-3 py-2 text-center text-rose-700 font-semibold">{row.value > 0 ? toArabicDigits(Number(row.value).toFixed(2)) : '-'}</td>
                       <td className="border border-slate-400 px-3 py-2 text-center text-emerald-700 font-bold">{row.payment > 0 ? toArabicDigits(Number(row.payment).toFixed(2)) : '-'}</td>
-                      <td className="border border-slate-400 px-3 py-2 text-center text-xs font-semibold text-slate-800">
-                        {row.paymentMethodName ? (
-                          <div>
-                            <div className="font-bold">{row.paymentMethodName}</div>
-                            {row.paymentReference && <div className="text-slate-500 font-mono text-[10px]">{toArabicDigits(row.paymentReference)}</div>}
-                          </div>
-                        ) : (
-                          <span className="text-slate-500">{row.payment > 0 ? 'نقدي / تحصيل' : 'آجل'}</span>
-                        )}
+                      <td className="border border-slate-400 px-3 py-2 text-center text-xs font-semibold">
+                        <PaymentMethodBadge name={row.paymentMethodName} isPayment={row.payment > 0} />
                       </td>
                       <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-100">{toArabicDigits(Number(row.balance).toFixed(2))}</td>
                     </tr>
@@ -242,6 +412,121 @@ export function CustomerStatement() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Advance Payment / Settlement */}
+      {showModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg">إضافة دفعة مقدمة / تسوية رصيد</h3>
+                <p className="text-xs text-slate-300">العميل: {statementData.customer.name}</p>
+              </div>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTransaction} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">نوع الحركة المالية</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTxType('CREDIT')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      txType === 'CREDIT' 
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20' 
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    تحصيل / دفعة مقدمة (خصم من الدين)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTxType('DEBIT')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      txType === 'DEBIT' 
+                        ? 'bg-rose-50 border-rose-500 text-rose-700 ring-2 ring-rose-500/20' 
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    تسوية مدين (إضافة على الدين)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">المبلغ (ج.م)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="أدخل المبلغ..."
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة السداد</label>
+                <select
+                  value={paymentMethodId}
+                  onChange={(e) => setPaymentMethodId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 font-semibold text-slate-800"
+                >
+                  {paymentMethods.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">الخزينة / البنك</label>
+                <select
+                  value={treasuryAccountId}
+                  onChange={(e) => setTreasuryAccountId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 font-semibold text-slate-800"
+                >
+                  {treasuryAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.name} (الرصيد: {acc.balance})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">البيان / سبب الحركة</label>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={txType === 'CREDIT' ? 'مثال: دفعة مقدمة لحساب فاتورة قادمة' : 'مثال: تسوية فروق حسابات'}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'جاري التسجيل...' : 'تأكيد وحفظ الحركة'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="px-5 py-3 border rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
