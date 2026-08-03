@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore } from '../../../store/authStore';
-import { FileText, Download, Users, ArrowUpDown, Save, Search, Settings2, Trash2 } from 'lucide-react';
+import { FileText, Download, Users, ArrowUpDown, Save, Search, Settings2, Trash2, PlusCircle, X, DollarSign } from 'lucide-react';
 import { TableSkeleton } from '../../../components/ui/Skeleton';
 import { toast } from '../../../store/toastStore';
 import { toArabicDigits } from '../../../utils/numberUtils';
-
 
 interface Customer {
   id: string;
@@ -36,10 +35,83 @@ export function ComprehensiveCustomerReport() {
   // Drag & Drop state
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
+  // Payment / Settlement Modal
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [txType, setTxType] = useState<'CREDIT' | 'DEBIT'>('CREDIT');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
+  const [treasuryAccountId, setTreasuryAccountId] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   useEffect(() => {
     fetchCustomers();
     loadProfiles();
+    fetchOptions();
   }, []);
+
+  const fetchOptions = async () => {
+    try {
+      const [pmRes, trRes] = await Promise.all([
+        fetch('/api/payment-methods', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/treasury/accounts', { headers: { Authorization: `Bearer ${token}` } })
+      ]);
+      if (pmRes.ok) {
+        const pmJson = await pmRes.json();
+        const pms = Array.isArray(pmJson) ? pmJson : pmJson.data || [];
+        setPaymentMethods(pms);
+        if (pms.length > 0) setPaymentMethodId(pms[0].id);
+      }
+      if (trRes.ok) {
+        const trJson = await trRes.json();
+        const accs = Array.isArray(trJson) ? trJson : trJson.data || [];
+        setTreasuryAccounts(accs);
+        if (accs.length > 0) setTreasuryAccountId(accs[0].id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const handleAddTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer || !amount || Number(amount) <= 0) {
+      toast.error('خطأ', 'يرجى إدخال مبلغ صحيح');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/customer-ledger/${selectedCustomer.id}/transaction`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          type: txType,
+          amount: Number(amount),
+          reason: reason || (txType === 'CREDIT' ? 'سداد قسط / دفعة لحساب العميل' : 'تسوية رصيد (مدين)'),
+          paymentMethodId,
+          treasuryAccountId
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'فشلت عملية التسجيل');
+      }
+      toast.success('نجاح', 'تم تسجيل السداد/الحركة المالية وتحديث رصيد العميل والخزينة بنجاح!');
+      setSelectedCustomer(null);
+      setAmount('');
+      setReason('');
+      fetchCustomers();
+    } catch (err: any) {
+      toast.error('خطأ', err.message || 'حدث خطأ أثناء حفظ الحركة');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const loadProfiles = async () => {
     try {
@@ -468,12 +540,13 @@ export function ComprehensiveCustomerReport() {
                         <th className="py-4 px-6 font-semibold text-slate-600 text-center print:text-black print:border print:border-gray-400 print:py-2">عليه (Debit)</th>
                         <th className="py-4 px-6 font-semibold text-slate-600 text-center print:text-black print:border print:border-gray-400 print:py-2">ليه (Credit)</th>
                         <th className="py-4 px-6 font-semibold text-slate-600 text-left print:text-black print:border print:border-gray-400 print:py-2">الفرق (الصافي)</th>
+                        <th className="py-4 px-6 font-semibold text-slate-600 text-center print:hidden">إجراءات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {groupData.length === 0 ? (
                         <tr>
-                          <td colSpan={isEditMode ? 6 : 5} className="py-8 text-center text-slate-500">لا توجد بيانات</td>
+                          <td colSpan={isEditMode ? 7 : 6} className="py-8 text-center text-slate-500">لا توجد بيانات</td>
                         </tr>
                       ) : (
                         groupData.map((c, idx) => (
@@ -551,6 +624,19 @@ export function ComprehensiveCustomerReport() {
                                 {Math.abs(c.net).toLocaleString()}
                               </div>
                             </td>
+                            <td className="py-4 px-6 text-center print:hidden">
+                              <button
+                                onClick={() => {
+                                  setSelectedCustomer(c);
+                                  setTxType('CREDIT');
+                                  setAmount('');
+                                }}
+                                className="inline-flex items-center space-x-1 space-x-reverse bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition-colors shadow-sm"
+                              >
+                                <PlusCircle size={14} />
+                                <span>سداد / دفعة</span>
+                              </button>
+                            </td>
                           </tr>
                         ))
                       )}
@@ -572,6 +658,121 @@ export function ComprehensiveCustomerReport() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Payment / Settlement Modal */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div className="bg-emerald-800 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg">تحصيل سداد / دفعة جديدة</h3>
+                <p className="text-xs text-emerald-100">العميل: {selectedCustomer.name}</p>
+              </div>
+              <button onClick={() => setSelectedCustomer(null)} className="text-emerald-200 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddTransaction} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">نوع الحركة المالية</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setTxType('CREDIT')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      txType === 'CREDIT' 
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-2 ring-emerald-500/20' 
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    سداد قسط / دفعة (خصم من الدين)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTxType('DEBIT')}
+                    className={`py-3 px-4 rounded-xl border text-sm font-bold transition-all ${
+                      txType === 'DEBIT' 
+                        ? 'bg-rose-50 border-rose-500 text-rose-700 ring-2 ring-rose-500/20' 
+                        : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    تسوية مدين (إضافة على الدين)
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">المبلغ (ج.م)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  step="any"
+                  required
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="أدخل المبلغ..."
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة السداد</label>
+                <select
+                  value={paymentMethodId}
+                  onChange={(e) => setPaymentMethodId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-semibold text-slate-800"
+                >
+                  {paymentMethods.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">إيداع في الخزينة / البنك</label>
+                <select
+                  value={treasuryAccountId}
+                  onChange={(e) => setTreasuryAccountId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-semibold text-slate-800"
+                >
+                  {treasuryAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.name} (الرصيد الحالي: {acc.balance})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">البيان / سبب السداد</label>
+                <input
+                  type="text"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder={txType === 'CREDIT' ? 'سداد قسط / دفعة حساب من كشف الحساب العمومي' : 'تسوية رصيد'}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 text-slate-800"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'جاري التسجيل...' : 'تأكيد السداد وتحديث الحسابات'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomer(null)}
+                  className="px-5 py-3 border rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -446,6 +446,10 @@ export class ReportsService {
              id: t.id,
              date: t.date,
              description: `فاتورة مبيعات ${inv.invoiceNumber}`,
+             invoiceNumber: inv.invoiceNumber,
+             totalAmount: inv.totalAmount,
+             amountPaid: inv.amountPaid,
+             remainingBalance: inv.totalAmount - inv.amountPaid,
              items: inv.items.map(item => ({
                productName: item.variant.product.name,
                quantity: item.quantity,

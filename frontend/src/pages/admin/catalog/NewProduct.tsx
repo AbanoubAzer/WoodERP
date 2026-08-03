@@ -34,7 +34,17 @@ export function NewProduct() {
   const fetchCategories = async () => {
     try {
       const res = await fetch('/api/categories', { headers: { Authorization: `Bearer ${token}` } });
-      setCategories(await res.json());
+      if (res.ok) {
+        const list = await res.json();
+        setCategories(list);
+        // Auto default to 'أخشاب'
+        const woodCat = list.find((c: any) => c.name.includes('أخشاب') || c.name.includes('خشب'));
+        if (woodCat) {
+          setFormData(prev => ({ ...prev, categoryId: prev.categoryId || woodCat.id }));
+        } else if (list.length > 0) {
+          setFormData(prev => ({ ...prev, categoryId: prev.categoryId || list[0].id }));
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -43,7 +53,16 @@ export function NewProduct() {
   const fetchWoodTypes = async () => {
     try {
       const res = await fetch('/api/wood-types', { headers: { Authorization: `Bearer ${token}` } });
-      setWoodTypes(await res.json());
+      if (res.ok) {
+        const list = await res.json();
+        setWoodTypes(list);
+        const woodTypeObj = list.find((w: any) => w.name.includes('أخشاب') || w.name.includes('خشب') || w.name.includes('موسكي') || w.name.includes('زوايا'));
+        if (woodTypeObj) {
+          setFormData(prev => ({ ...prev, woodTypeId: prev.woodTypeId || woodTypeObj.id }));
+        } else if (list.length > 0) {
+          setFormData(prev => ({ ...prev, woodTypeId: prev.woodTypeId || list[0].id }));
+        }
+      }
     } catch (err) {
       console.error(err);
     }
@@ -65,9 +84,34 @@ export function NewProduct() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.categoryId) {
-      toast.error('الرجاء اختيار الفئة');
-      return;
+    
+    let activeCatId = formData.categoryId;
+    let activeWoodTypeId = formData.woodTypeId;
+
+    // Auto-create/select 'أخشاب' category if not selected
+    if (!activeCatId) {
+      const existing = categories.find((c: any) => c.name.includes('أخشاب') || c.name.includes('خشب'));
+      if (existing) {
+        activeCatId = existing.id;
+      } else {
+        try {
+          const createRes = await fetch('/api/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ name: 'أخشاب' })
+          });
+          if (createRes.ok) {
+            const newCat = await createRes.json();
+            activeCatId = newCat.id;
+          }
+        } catch (err) {
+          console.error('Failed to auto-create category أخشاب', err);
+        }
+      }
+    }
+
+    if (!activeCatId && categories.length > 0) {
+      activeCatId = categories[0].id;
     }
 
     setIsSubmitting(true);
@@ -91,7 +135,8 @@ export function NewProduct() {
         },
         body: JSON.stringify({
           ...formData,
-          woodTypeId: formData.woodTypeId || undefined,
+          categoryId: activeCatId,
+          woodTypeId: activeWoodTypeId || undefined,
           variants: formattedVariants
         })
       });

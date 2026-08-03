@@ -29,6 +29,10 @@ export function CustomerStatement() {
   const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Installment Payment Modal State
+  const [selectedInstallment, setSelectedInstallment] = useState<any>(null);
+  const [payAmount, setPayAmount] = useState('');
+
   useEffect(() => {
     fetchStatement();
     fetchOptions();
@@ -126,6 +130,41 @@ export function CustomerStatement() {
       fetchStatement();
     } catch (err: any) {
       toast.error(err.message || 'حدث خطأ أثناء حفظ الحركة');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handlePayInstallmentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedInstallment || !payAmount || Number(payAmount) <= 0) {
+      toast.warning('يرجى إدخال مبلغ سداد صحيح');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      const res = await fetch(`/api/installments/${selectedInstallment.id}/pay`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          amount: Number(payAmount),
+          paymentMethodId,
+          treasuryAccountId
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'فشلت عملية سداد القسط');
+      }
+      toast.success('تم سداد القسط وتحديث الخزينة وحساب العميل بنجاح!');
+      setSelectedInstallment(null);
+      setPayAmount('');
+      fetchStatement();
+    } catch (err: any) {
+      toast.error(err.message || 'حدث خطأ أثناء سداد القسط');
     } finally {
       setIsSubmitting(false);
     }
@@ -313,31 +352,49 @@ export function CustomerStatement() {
                 const hasItems = row.items && row.items.length > 0;
                 
                 if (hasItems) {
-                  return row.items.map((item: any, itemIdx: number) => {
-                    const isFirst = itemIdx === 0;
-                    return (
-                      <tr key={`${row.id}-${itemIdx}`} className="page-break-inside-avoid">
-                        <td className="border border-slate-400 px-3 py-2 text-center whitespace-nowrap">
-                          {isFirst ? toArabicDigits(new Date(row.date).toLocaleDateString('ar-EG')) : ''}
+                  return (
+                    <React.Fragment key={`inv-group-${row.id}`}>
+                      {/* Invoice Summary Header Row */}
+                      <tr className="bg-slate-100/90 font-bold border-b border-slate-400 page-break-inside-avoid">
+                        <td className="border border-slate-400 px-3 py-2 text-center font-bold text-slate-800">
+                          {toArabicDigits(new Date(row.date).toLocaleDateString('ar-EG'))}
                         </td>
-                        <td className="border border-slate-400 px-3 py-2 text-right">{item.productName}</td>
-                        <td className="border border-slate-400 px-3 py-2 text-center">{toArabicDigits(item.quantity)}</td>
-                        <td className="border border-slate-400 px-3 py-2 text-center">{toArabicDigits(Number(item.price).toFixed(2))}</td>
-                        <td className="border border-slate-400 px-3 py-2 text-center font-semibold text-rose-700">{toArabicDigits(Number(item.subtotal).toFixed(2))}</td>
-                        <td className="border border-slate-400 px-3 py-2 text-center text-emerald-700 font-bold">
-                          {isFirst && row.payment > 0 ? toArabicDigits(Number(row.payment).toFixed(2)) : '-'}
+                        <td className="border border-slate-400 px-3 py-2 text-right text-indigo-900 font-black" colSpan={3}>
+                          {row.description}
+                        </td>
+                        <td className="border border-slate-400 px-3 py-2 text-center text-xs font-bold text-rose-700">
+                          {toArabicDigits(Number(row.totalAmount || row.value).toFixed(2))} ج.م
+                        </td>
+                        <td className="border border-slate-400 px-3 py-2 text-center text-xs font-bold text-emerald-700">
+                          {row.amountPaid !== undefined ? toArabicDigits(Number(row.amountPaid).toFixed(2)) : (row.payment > 0 ? toArabicDigits(Number(row.payment).toFixed(2)) : '-')}
                         </td>
                         <td className="border border-slate-400 px-3 py-2 text-center text-xs font-semibold">
-                          {isFirst ? (
-                            <PaymentMethodBadge name={row.paymentMethodName} isPayment={row.payment > 0} />
-                          ) : ''}
+                          <PaymentMethodBadge name={row.paymentMethodName} isPayment={row.payment > 0 || (row.amountPaid && row.amountPaid > 0)} />
                         </td>
-                        <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-50">
-                          {isFirst ? toArabicDigits(Number(row.balance).toFixed(2)) : ''}
+                        <td className="border border-slate-400 px-3 py-2 text-center font-bold bg-slate-200 text-slate-900">
+                          {toArabicDigits(Number(row.balance).toFixed(2))}
                         </td>
                       </tr>
-                    );
-                  });
+
+                      {/* Itemized Rows */}
+                      {row.items.map((item: any, itemIdx: number) => (
+                        <tr key={`${row.id}-${itemIdx}`} className="page-break-inside-avoid bg-white hover:bg-slate-50 text-xs">
+                          <td className="border border-slate-300 px-3 py-1.5 text-center text-slate-400 text-[11px]">
+                            {toArabicDigits(itemIdx + 1)}
+                          </td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-right font-medium text-slate-800 pr-6">
+                            ↳ {item.productName}
+                          </td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center">{toArabicDigits(item.quantity)}</td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center">{toArabicDigits(Number(item.price).toFixed(2))}</td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center font-semibold text-rose-600">{toArabicDigits(Number(item.subtotal).toFixed(2))}</td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center text-slate-400">-</td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center text-slate-400">-</td>
+                          <td className="border border-slate-300 px-3 py-1.5 text-center text-slate-400 bg-slate-50/50">-</td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
                 } else {
                   return (
                     <tr key={row.id} className="page-break-inside-avoid bg-slate-50/50">
@@ -404,7 +461,13 @@ export function CustomerStatement() {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center print:hidden">
-                      <button className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors">
+                      <button
+                        onClick={() => {
+                          setSelectedInstallment(inst);
+                          setPayAmount((inst.amount - inst.paidAmount).toString());
+                        }}
+                        className="bg-emerald-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+                      >
                         سداد
                       </button>
                     </td>
@@ -521,6 +584,82 @@ export function CustomerStatement() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
+                  className="px-5 py-3 border rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+                >
+                  إلغاء
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal for Installment Payment */}
+      {selectedInstallment && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-100 animate-in fade-in zoom-in duration-200">
+            <div className="bg-emerald-700 p-5 text-white flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-lg">سداد قسط رقم #{toArabicDigits(selectedInstallment.installmentNumber)}</h3>
+                <p className="text-xs text-emerald-100">المبلغ المستحق: {toArabicDigits(selectedInstallment.amount - selectedInstallment.paidAmount)} ج.م</p>
+              </div>
+              <button onClick={() => setSelectedInstallment(null)} className="text-emerald-200 hover:text-white p-1 rounded-lg">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handlePayInstallmentSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">مبلغ السداد (ج.م)</label>
+                <input
+                  type="number"
+                  min="0.01"
+                  max={selectedInstallment.amount - selectedInstallment.paidAmount}
+                  step="any"
+                  required
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-bold text-slate-800"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة السداد</label>
+                <select
+                  value={paymentMethodId}
+                  onChange={(e) => setPaymentMethodId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-semibold text-slate-800"
+                >
+                  {paymentMethods.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">إيداع في الخزينة / البنك</label>
+                <select
+                  value={treasuryAccountId}
+                  onChange={(e) => setTreasuryAccountId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 font-semibold text-slate-800"
+                >
+                  {treasuryAccounts.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.name} (الرصيد: {acc.balance})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'جاري السداد...' : 'تأكيد وحفظ سداد القسط'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedInstallment(null)}
                   className="px-5 py-3 border rounded-xl text-slate-600 font-bold hover:bg-slate-50 transition-colors"
                 >
                   إلغاء
