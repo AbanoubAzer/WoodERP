@@ -48,10 +48,10 @@ export function AgingReports() {
   );
 
   const chartData = [
-    { name: '0-30 يوم', amount: currentData.summary['0-30'] || 0 },
-    { name: '31-60 يوم', amount: currentData.summary['31-60'] || 0 },
-    { name: '61-90 يوم', amount: currentData.summary['61-90'] || 0 },
-    { name: 'أكثر من 90 يوم', amount: currentData.summary['90+'] || 0 },
+    { name: '0-30 يوم', amount: currentData.summary?.['0-30'] ?? 0 },
+    { name: '31-60 يوم', amount: currentData.summary?.['31-60'] ?? 0 },
+    { name: '61-90 يوم', amount: currentData.summary?.['61-90'] ?? 0 },
+    { name: 'أكثر من 90 يوم', amount: currentData.summary?.['90+'] ?? 0 },
   ];
 
   return (
@@ -102,7 +102,7 @@ export function AgingReports() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-slate-500 text-sm font-semibold mb-1">أكثر من 90 يوم (مخاطر عالية)</p>
-              <h3 className="text-3xl font-black text-rose-600">{currentData.summary['90+'].toLocaleString()} <span className="text-sm font-normal text-rose-400">ج.م</span></h3>
+              <h3 className="text-3xl font-black text-rose-600">{(currentData.summary?.['90+'] ?? 0).toLocaleString()} <span className="text-sm font-normal text-rose-400">ج.م</span></h3>
             </div>
             <div className="p-3 rounded-xl bg-rose-50 text-rose-600">
               <Clock size={24} />
