@@ -29,6 +29,7 @@ export function NewPurchaseInvoice() {
   const [createInstallments, setCreateInstallments] = useState(false);
   const [installmentsCount, setInstallmentsCount] = useState(3);
   const [interestRate, setInterestRate] = useState(0);
+  const [installmentMode, setInstallmentMode] = useState<'DATED' | 'UNDATED'>('DATED');
   const [customInstallments, setCustomInstallments] = useState<{ id: number; dueDate: string; amount: number }[]>([]);
 
   const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitCost), 0);
@@ -52,12 +53,12 @@ export function NewPurchaseInvoice() {
       d.setMonth(d.getMonth() + i);
       newInstallments.push({
         id: i + 1,
-        dueDate: d.toISOString().split('T')[0],
+        dueDate: installmentMode === 'DATED' ? d.toISOString().split('T')[0] : '',
         amount: Number(amountPerInstallment.toFixed(2))
       });
     }
     setCustomInstallments(newInstallments);
-  }, [createInstallments, installmentsCount, interestRate, totalAmount, amountPaid]);
+  }, [createInstallments, installmentsCount, interestRate, totalAmount, amountPaid, installmentMode]);
 
   const updateCustomInstallment = (index: number, field: string, value: any) => {
     const updated = [...customInstallments];
@@ -350,6 +351,19 @@ export function NewPurchaseInvoice() {
                 
                 {createInstallments && (
                   <div className="space-y-4 pt-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">طبيعة ميعاد الأقساط</label>
+                      <div className="flex gap-4 bg-white p-2.5 rounded-xl border border-slate-200">
+                        <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                          <input type="radio" checked={installmentMode === 'DATED'} onChange={() => setInstallmentMode('DATED')} className="text-sky-600 focus:ring-sky-500" />
+                          أقساط مجدولة بتاريخ
+                        </label>
+                        <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-amber-700">
+                          <input type="radio" checked={installmentMode === 'UNDATED'} onChange={() => setInstallmentMode('UNDATED')} className="text-amber-600 focus:ring-amber-500" />
+                          دفعات بدون تاريخ (مرنة)
+                        </label>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm font-semibold text-slate-700 mb-2">عدد الأقساط</label>
@@ -370,23 +384,25 @@ export function NewPurchaseInvoice() {
                           <table className="w-full text-right text-sm">
                             <thead className="bg-slate-50 border-b">
                               <tr>
-                                <th className="p-2 font-semibold text-slate-600">القسط</th>
-                                <th className="p-2 font-semibold text-slate-600">التاريخ</th>
+                                <th className="p-2 font-semibold text-slate-600">الدفعة / القسط</th>
+                                {installmentMode === 'DATED' && <th className="p-2 font-semibold text-slate-600">التاريخ</th>}
                                 <th className="p-2 font-semibold text-slate-600">المبلغ</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y">
                               {customInstallments.map((inst, idx) => (
                                 <tr key={idx}>
-                                  <td className="p-2 font-bold text-slate-600">#{inst.id}</td>
-                                  <td className="p-2">
-                                    <input 
-                                      type="date" 
-                                      value={inst.dueDate} 
-                                      onChange={e => updateCustomInstallment(idx, 'dueDate', e.target.value)}
-                                      className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-sky-500/20"
-                                    />
-                                  </td>
+                                  <td className="p-2 font-bold text-slate-600">#{inst.id} {installmentMode === 'UNDATED' ? '(دفعة بدون تاريخ)' : ''}</td>
+                                  {installmentMode === 'DATED' && (
+                                    <td className="p-2">
+                                      <input 
+                                        type="date" 
+                                        value={inst.dueDate || ''} 
+                                        onChange={e => updateCustomInstallment(idx, 'dueDate', e.target.value)}
+                                        className="w-full px-2 py-1 border rounded focus:ring-2 focus:ring-sky-500/20"
+                                      />
+                                    </td>
+                                  )}
                                   <td className="p-2">
                                     <input 
                                       type="number" 

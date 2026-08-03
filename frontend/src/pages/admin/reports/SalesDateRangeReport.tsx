@@ -20,6 +20,7 @@ interface Invoice {
   amountPaid: number;
   balance: number;
   status: string;
+  paymentMethodName?: string;
 }
 
 interface TopProduct {
@@ -257,6 +258,7 @@ export function SalesDateRangeReport() {
                     <th className="py-4 px-6 font-semibold text-slate-600 print:text-black print:border print:border-gray-400 print:py-2">رقم الفاتورة</th>
                     <th className="py-4 px-6 font-semibold text-slate-600 print:text-black print:border print:border-gray-400 print:py-2">العميل</th>
                     <th className="py-4 px-6 font-semibold text-slate-600 print:text-black print:border print:border-gray-400 print:py-2">التاريخ</th>
+                    <th className="py-4 px-6 font-semibold text-slate-600 print:text-black print:border print:border-gray-400 print:py-2">طريقة السداد</th>
                     <th className="py-4 px-6 font-semibold text-slate-600 text-center print:text-black print:border print:border-gray-400 print:py-2">الإجمالي</th>
                     <th className="py-4 px-6 font-semibold text-slate-600 text-center print:text-black print:border print:border-gray-400 print:py-2">المدفوع</th>
                     <th className="py-4 px-6 font-semibold text-slate-600 text-center print:text-black print:border print:border-gray-400 print:py-2">المتبقي</th>
@@ -265,7 +267,7 @@ export function SalesDateRangeReport() {
                 <tbody className="divide-y divide-slate-100">
                   {invoices.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500">لا توجد مبيعات في هذه الفترة</td>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">لا توجد مبيعات في هذه الفترة</td>
                     </tr>
                   ) : (
                     invoices.map((inv) => (
@@ -278,6 +280,9 @@ export function SalesDateRangeReport() {
                         </td>
                         <td className="py-4 px-6 text-sm text-slate-600 print:text-black print:border print:border-gray-300 print:py-2">
                           {new Date(inv.issuedAt).toLocaleDateString('ar-EG')}
+                        </td>
+                        <td className="py-4 px-6 text-sm font-semibold text-indigo-700 print:text-black print:border print:border-gray-300 print:py-2">
+                          {inv.paymentMethodName || 'آجل / تقسيط'}
                         </td>
                         <td className="py-4 px-6 text-center font-bold text-slate-800 print:text-black print:border print:border-gray-300 print:py-2">
                           {inv.totalAmount.toLocaleString()}

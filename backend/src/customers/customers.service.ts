@@ -30,7 +30,7 @@ export class CustomersService {
             type: 'DEBIT',
             amount: openingBalance,
             runningBalance: openingBalance,
-            reason: 'Opening Balance',
+            reason: 'رصيد افتتاحي',
           },
         });
       }
@@ -58,7 +58,7 @@ export class CustomersService {
 
     if (page && limit) {
       const skip = (page - 1) * limit;
-      const [total, customers] = await Promise.all([
+      const [total, customersList] = await Promise.all([
         this.prisma.customer.count({ where }),
         this.prisma.customer.findMany({
           where,
@@ -67,6 +67,10 @@ export class CustomersService {
               orderBy: { date: 'desc' },
               take: 1,
             },
+            installmentPlans: {
+              where: { status: 'ACTIVE' },
+              include: { installments: true }
+            }
           },
           orderBy: { createdAt: 'desc' },
           skip,
@@ -74,11 +78,22 @@ export class CustomersService {
         }),
       ]);
 
-      const data = customers.map((c) => {
+      const data = customersList.map((c: any) => {
         const balance =
           c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
-        const { transactions, ...rest } = c;
-        return { ...rest, balance };
+        
+        let installmentType = 'CREDIT';
+        if (c.installmentPlans && c.installmentPlans.length > 0) {
+          const allInsts = c.installmentPlans.flatMap((p: any) => p.installments || []);
+          if (allInsts.some((i: any) => i.dueDate === null || i.dueDate === undefined)) {
+            installmentType = 'UNDATED';
+          } else if (allInsts.length > 0) {
+            installmentType = 'DATED';
+          }
+        }
+
+        const { transactions, installmentPlans, ...rest } = c;
+        return { ...rest, balance, installmentType };
       });
 
       return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -91,15 +106,30 @@ export class CustomersService {
           orderBy: { date: 'desc' },
           take: 1,
         },
+        installmentPlans: {
+          where: { status: 'ACTIVE' },
+          include: { installments: true }
+        }
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return customers.map((c) => {
+    return customers.map((c: any) => {
       const balance =
         c.transactions.length > 0 ? c.transactions[0].runningBalance : 0;
-      const { transactions, ...rest } = c;
-      return { ...rest, balance };
+      
+      let installmentType = 'CREDIT';
+      if (c.installmentPlans && c.installmentPlans.length > 0) {
+        const allInsts = c.installmentPlans.flatMap((p: any) => p.installments || []);
+        if (allInsts.some((i: any) => i.dueDate === null || i.dueDate === undefined)) {
+          installmentType = 'UNDATED';
+        } else if (allInsts.length > 0) {
+          installmentType = 'DATED';
+        }
+      }
+
+      const { transactions, installmentPlans, ...rest } = c;
+      return { ...rest, balance, installmentType };
     });
   }
 

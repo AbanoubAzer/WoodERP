@@ -25,6 +25,7 @@ export function NewInstallmentPlan() {
   const [numberOfMonths, setNumberOfMonths] = useState('3');
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   
+  const [hasDueDate, setHasDueDate] = useState(true);
   const [generatedSchedule, setGeneratedSchedule] = useState<any[]>([]);
 
   useEffect(() => {
@@ -59,11 +60,15 @@ export function NewInstallmentPlan() {
 
     const installmentAmount = amount / months;
     const schedule = Array.from({ length: months }).map((_, i) => {
-      const date = new Date(startDate);
-      date.setMonth(date.getMonth() + i);
+      let dueDateStr = '';
+      if (hasDueDate) {
+        const date = new Date(startDate);
+        date.setMonth(date.getMonth() + i);
+        dueDateStr = date.toISOString().split('T')[0];
+      }
       return {
         installmentNumber: i + 1,
-        dueDate: date.toISOString().split('T')[0],
+        dueDate: dueDateStr,
         amount: installmentAmount
       };
     });
@@ -180,14 +185,29 @@ export function NewInstallmentPlan() {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">عدد الأشهر</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">عدد الدفعات / الأقساط</label>
               <input type="number" value={numberOfMonths} onChange={e => setNumberOfMonths(e.target.value)} className="w-full px-4 py-3 border rounded-xl" />
             </div>
             <div>
+              <label className="block text-sm font-semibold text-slate-700 mb-2">طبيعة تاريخ المواعيد</label>
+              <div className="flex items-center gap-4 mt-2">
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer">
+                  <input type="radio" checked={hasDueDate} onChange={() => setHasDueDate(true)} />
+                  محددة بتاريخ
+                </label>
+                <label className="flex items-center gap-2 text-sm font-semibold cursor-pointer text-orange-600">
+                  <input type="radio" checked={!hasDueDate} onChange={() => setHasDueDate(false)} />
+                  بدون تاريخ (دفعات مرنة)
+                </label>
+              </div>
+            </div>
+          </div>
+          {hasDueDate && (
+            <div className="md:col-span-2">
               <label className="block text-sm font-semibold text-slate-700 mb-2">تاريخ أول قسط</label>
               <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-full px-4 py-3 border rounded-xl" />
             </div>
-          </div>
+          )}
         </div>
 
         <button type="button" onClick={handleGenerate} className="w-full mb-8 flex justify-center items-center space-x-2 space-x-reverse px-8 py-3 bg-slate-900 text-white rounded-xl font-bold hover:bg-slate-800">
@@ -202,13 +222,15 @@ export function NewInstallmentPlan() {
               <div className="space-y-3">
                 {generatedSchedule.map((inst, idx) => (
                   <div key={idx} className="flex gap-4 items-center bg-white p-3 rounded-lg border shadow-sm">
-                    <div className="w-16 text-center font-bold text-slate-500">قسط {inst.installmentNumber}</div>
+                    <div className="w-24 font-bold text-slate-600">دفعة #{inst.installmentNumber} {!hasDueDate ? '(بدون تاريخ)' : ''}</div>
+                    {hasDueDate && (
+                      <div className="flex-1">
+                        <label className="block text-xs text-slate-400 mb-1">تاريخ الاستحقاق</label>
+                        <input type="date" value={inst.dueDate} onChange={e => updateScheduleItem(idx, 'dueDate', e.target.value)} className="w-full px-3 py-2 border rounded" />
+                      </div>
+                    )}
                     <div className="flex-1">
-                      <label className="block text-xs text-slate-400 mb-1">تاريخ الاستحقاق</label>
-                      <input type="date" value={inst.dueDate} onChange={e => updateScheduleItem(idx, 'dueDate', e.target.value)} className="w-full px-3 py-2 border rounded" />
-                    </div>
-                    <div className="flex-1">
-                      <label className="block text-xs text-slate-400 mb-1">قيمة القسط (ج.م)</label>
+                      <label className="block text-xs text-slate-400 mb-1">قيمة القسط / الدفعة (ج.م)</label>
                       <input type="number" value={inst.amount} onChange={e => updateScheduleItem(idx, 'amount', e.target.value)} className="w-full px-3 py-2 border rounded font-bold text-orange-600" />
                     </div>
                   </div>

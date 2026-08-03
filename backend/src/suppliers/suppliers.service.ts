@@ -28,7 +28,7 @@ export class SuppliersService {
             type: 'PURCHASE', // PURCHASE increases what we owe the supplier
             amount: openingBalance,
             runningBalance: openingBalance,
-            reason: 'Opening Balance',
+            reason: 'رصيد افتتاحي',
           },
         });
       }
@@ -56,7 +56,7 @@ export class SuppliersService {
 
     if (page && limit) {
       const skip = (page - 1) * limit;
-      const [total, suppliers] = await Promise.all([
+      const [total, suppliersList] = await Promise.all([
         this.prisma.supplier.count({ where }),
         this.prisma.supplier.findMany({
           where,
@@ -65,6 +65,10 @@ export class SuppliersService {
               orderBy: { date: 'desc' },
               take: 1,
             },
+            installmentPlans: {
+              where: { status: 'ACTIVE' },
+              include: { installments: true }
+            }
           },
           orderBy: { createdAt: 'desc' },
           skip,
@@ -72,11 +76,22 @@ export class SuppliersService {
         }),
       ]);
 
-      const data = suppliers.map((s) => {
+      const data = suppliersList.map((s: any) => {
         const balance =
           s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
-        const { transactions, ...rest } = s;
-        return { ...rest, balance };
+        
+        let installmentType = 'CREDIT';
+        if (s.installmentPlans && s.installmentPlans.length > 0) {
+          const allInsts = s.installmentPlans.flatMap((p: any) => p.installments || []);
+          if (allInsts.some((i: any) => i.dueDate === null || i.dueDate === undefined)) {
+            installmentType = 'UNDATED';
+          } else if (allInsts.length > 0) {
+            installmentType = 'DATED';
+          }
+        }
+
+        const { transactions, installmentPlans, ...rest } = s;
+        return { ...rest, balance, installmentType };
       });
 
       return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
@@ -89,15 +104,30 @@ export class SuppliersService {
           orderBy: { date: 'desc' },
           take: 1,
         },
+        installmentPlans: {
+          where: { status: 'ACTIVE' },
+          include: { installments: true }
+        }
       },
       orderBy: { createdAt: 'desc' },
     });
 
-    return suppliers.map((s) => {
+    return suppliers.map((s: any) => {
       const balance =
         s.transactions.length > 0 ? s.transactions[0].runningBalance : 0;
-      const { transactions, ...rest } = s;
-      return { ...rest, balance };
+      
+      let installmentType = 'CREDIT';
+      if (s.installmentPlans && s.installmentPlans.length > 0) {
+        const allInsts = s.installmentPlans.flatMap((p: any) => p.installments || []);
+        if (allInsts.some((i: any) => i.dueDate === null || i.dueDate === undefined)) {
+          installmentType = 'UNDATED';
+        } else if (allInsts.length > 0) {
+          installmentType = 'DATED';
+        }
+      }
+
+      const { transactions, installmentPlans, ...rest } = s;
+      return { ...rest, balance, installmentType };
     });
   }
 

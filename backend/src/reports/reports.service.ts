@@ -413,6 +413,7 @@ export class ReportsService {
     const invoices = await this.prisma.salesInvoice.findMany({
       where: { id: { in: invoiceIds as string[] } },
       include: {
+        paymentMethod: true,
         items: {
           include: { variant: { include: { product: true } } }
         }
@@ -420,6 +421,22 @@ export class ReportsService {
     });
 
     const invoiceMap = new Map(invoices.map(inv => [inv.id, inv]));
+
+    const allCustomerInvoices = await this.prisma.salesInvoice.findMany({
+      where: { customerId },
+      select: { id: true, invoiceNumber: true }
+    });
+    const customerInvoiceMap = new Map(allCustomerInvoices.map(inv => [inv.id, inv.invoiceNumber]));
+
+    const plans = await this.prisma.installmentPlan.findMany({
+      where: { customerId }
+    });
+
+    const defaultInvoiceNumber = allCustomerInvoices.length === 1 
+      ? allCustomerInvoices[0].invoiceNumber 
+      : (plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId)) 
+          ? customerInvoiceMap.get(plans.find(p => p.referenceInvoiceId && customerInvoiceMap.has(p.referenceInvoiceId))!.referenceInvoiceId!) 
+          : (allCustomerInvoices.length > 0 ? allCustomerInvoices[allCustomerInvoices.length - 1].invoiceNumber : ''));
 
     const statementLines = transactions.map(t => {
       if (t.type === 'DEBIT' && t.referenceId) {
@@ -437,19 +454,37 @@ export class ReportsService {
              })),
              value: t.amount,
              payment: 0,
-             balance: t.runningBalance
+             balance: t.runningBalance,
+             paymentMethodName: inv.paymentMethod?.name || (inv.amountPaid >= inv.totalAmount ? 'نقدي' : inv.amountPaid > 0 ? 'دفع جزئي' : 'آجل / تقسيط'),
+             paymentReference: inv.paymentReference
            };
         }
       }
+      let formattedReason = t.reason 
+        ? t.reason
+            .replace(/Payment for Installment #?(\d+)/gi, 'سداد قسط رقم #$1')
+            .replace(/Payment for Installment/gi, 'سداد قسط')
+            .replace(/Opening Balance/gi, 'رصيد افتتاحي')
+            .replace(/Payment Receipt/gi, 'سند تحصيل / إيصال سداد')
+            .replace(/Sales Invoice/gi, 'فاتورة مبيعات')
+            .replace(/Purchase Invoice/gi, 'فاتورة مشتريات')
+            .replace(/Down payment/gi, 'دفعة مقدمة')
+            .replace(/Installment interest/gi, 'فوائد تقسيط')
+        : (t.type === 'CREDIT' ? 'ايداع بنك/نقدي' : 'معاملة');
+
+      if (formattedReason.includes('سداد قسط') && !formattedReason.includes('فاتورة رقم') && defaultInvoiceNumber) {
+        formattedReason += ` (فاتورة رقم ${defaultInvoiceNumber})`;
+      }
+
       return {
         id: t.id,
         date: t.date,
-        description: t.reason || (t.type === 'CREDIT' ? 'ايداع بنك/نقدي' : 'معاملة'),
+        description: formattedReason,
         items: [],
         value: t.type === 'DEBIT' ? t.amount : 0,
         payment: t.type === 'CREDIT' ? t.amount : 0,
         balance: t.runningBalance,
-        paymentMethodName: t.paymentMethod?.name,
+        paymentMethodName: t.paymentMethod?.name || (t.type === 'CREDIT' ? 'نقدي / تحصيل' : 'آجل'),
         paymentReference: t.paymentReference
       };
     });
@@ -514,6 +549,7 @@ export class ReportsService {
       where: whereClause,
       include: {
         customer: { select: { name: true, code: true } },
+        paymentMethod: true,
         items: {
           include: {
             variant: {
@@ -573,7 +609,9 @@ export class ReportsService {
         totalAmount: inv.totalAmount,
         amountPaid: inv.amountPaid,
         balance: inv.totalAmount - inv.amountPaid,
-        status: inv.status
+        status: inv.status,
+        paymentMethodName: inv.paymentMethod?.name || (inv.amountPaid >= inv.totalAmount ? 'نقدي' : inv.amountPaid > 0 ? 'دفع جزئي' : 'آجل / تقسيط'),
+        paymentReference: inv.paymentReference || ''
       })),
       topProducts
     };

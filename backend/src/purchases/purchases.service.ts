@@ -96,7 +96,7 @@ export class PurchasesService {
             variantId: item.variantId,
             quantity: item.quantity,
             toWarehouseId: item.warehouseId,
-            reason: `Purchase Invoice ${invoiceNumber}`,
+            reason: `فاتورة مشتريات رقم ${invoiceNumber}`,
           },
         });
       }
@@ -115,7 +115,8 @@ export class PurchasesService {
           amount: totalAmount,
           runningBalance: currentBalance + totalAmount,
           referenceId: invoice.id,
-          reason: `Purchase Invoice ${invoiceNumber}`,
+          paymentMethodId: data.paymentMethodId || null,
+          reason: `فاتورة مشتريات رقم ${invoiceNumber}`,
         },
       });
 
@@ -268,6 +269,7 @@ export class PurchasesService {
         where,
         include: {
           supplier: true,
+          paymentMethod: true,
           createdBy: { select: { id: true, name: true, email: true } },
         },
         orderBy: { issuedAt: 'desc' },

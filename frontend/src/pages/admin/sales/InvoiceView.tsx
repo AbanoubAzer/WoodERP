@@ -117,8 +117,14 @@ export function InvoiceView() {
             </div>
             
             {/* Payment Summary */}
+            {invoice.paymentMethod?.name && (
+              <div className="flex justify-between mt-2 text-slate-700">
+                <span>طريقة السداد:</span>
+                <span className="font-bold text-slate-800">{invoice.paymentMethod.name}</span>
+              </div>
+            )}
             {invoice.amountPaid > 0 && (
-              <div className="flex justify-between mt-3 text-slate-700">
+              <div className="flex justify-between mt-2 text-slate-700">
                 <span>المبلغ المدفوع:</span>
                 <span className="font-bold text-emerald-600">{invoice.amountPaid.toLocaleString()} ج.م</span>
               </div>
@@ -135,16 +141,16 @@ export function InvoiceView() {
         {/* Installments Schedule */}
         {invoice.installmentPlan && (
           <div className="mt-12 border-t-2 border-slate-800 pt-8">
-            <h3 className="text-xl font-black text-slate-900 mb-4">جدول الأقساط المجدولة</h3>
+            <h3 className="text-xl font-black text-slate-900 mb-4">جدول الأقساط والدفعات</h3>
             <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
               <div className="flex gap-8 mb-6 text-sm text-slate-600">
-                <p><strong>عدد الأقساط:</strong> {invoice.installmentPlan.numberOfMonths} شهر</p>
+                <p><strong>عدد الدفعات:</strong> {invoice.installmentPlan.numberOfMonths} دفعات</p>
                 <p><strong>إجمالي مبلغ التقسيط (شامل الفوائد إن وجدت):</strong> {invoice.installmentPlan.totalAmount.toLocaleString()} ج.م</p>
               </div>
               <table className="w-full text-right bg-white rounded-lg overflow-hidden border border-slate-200">
                 <thead className="bg-slate-100 border-b border-slate-200">
                   <tr>
-                    <th className="py-2 px-4 font-bold text-slate-700">رقم القسط</th>
+                    <th className="py-2 px-4 font-bold text-slate-700">رقم الدفعة / القسط</th>
                     <th className="py-2 px-4 font-bold text-slate-700 text-center">تاريخ الاستحقاق (التحصيل)</th>
                     <th className="py-2 px-4 font-bold text-slate-700 text-left">المبلغ</th>
                   </tr>
@@ -152,8 +158,10 @@ export function InvoiceView() {
                 <tbody className="divide-y divide-slate-100">
                   {invoice.installmentPlan.installments.map((inst: any) => (
                     <tr key={inst.id}>
-                      <td className="py-2 px-4 text-slate-600 font-medium">قسط #{inst.installmentNumber}</td>
-                      <td className="py-2 px-4 text-center text-slate-600 font-mono">{new Date(inst.dueDate).toLocaleDateString('ar-EG')}</td>
+                      <td className="py-2 px-4 text-slate-600 font-medium">دفعة #{inst.installmentNumber}</td>
+                      <td className="py-2 px-4 text-center text-slate-600 font-mono">
+                        {inst.dueDate ? new Date(inst.dueDate).toLocaleDateString('ar-EG') : 'دفعة بدون تاريخ (مرنة)'}
+                      </td>
                       <td className="py-2 px-4 text-left font-bold text-slate-900">{inst.amount.toLocaleString()} ج.م</td>
                     </tr>
                   ))}

@@ -3,7 +3,7 @@ import { PaymentMethodsService } from './payment-methods.service';
 import { JwtAuthGuard } from '../auth/jwt.guard';
 import { CurrentTenant } from '../common/decorators/current-tenant.decorator';
 
-@Controller('payment-methods')
+@Controller('api/payment-methods')
 @UseGuards(JwtAuthGuard)
 export class PaymentMethodsController {
   constructor(private readonly paymentMethodsService: PaymentMethodsService) {}

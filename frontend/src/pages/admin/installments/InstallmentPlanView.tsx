@@ -23,10 +23,13 @@ export function InstallmentPlanView() {
   const [settlementAmount, setSettlementAmount] = useState('');
   const [treasuryAccounts, setTreasuryAccounts] = useState<any[]>([]);
   const [treasuryAccountId, setTreasuryAccountId] = useState('');
+  const [paymentMethods, setPaymentMethods] = useState<any[]>([]);
+  const [paymentMethodId, setPaymentMethodId] = useState('');
 
   useEffect(() => {
     fetchPlan();
     fetchTreasuryAccounts();
+    fetchPaymentMethods();
   }, [id]);
 
   const fetchPlan = async () => {
@@ -57,6 +60,20 @@ export function InstallmentPlanView() {
     }
   };
 
+  const fetchPaymentMethods = async () => {
+    try {
+      const res = await fetch('/api/payment-methods', { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        const active = data.filter((m: any) => m.isActive);
+        setPaymentMethods(active);
+        if (active.length > 0) setPaymentMethodId(active[0].id);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
   const openPayModal = (inst: any) => {
     setSelectedInstallment(inst);
     setPayAmount((inst.amount - inst.paidAmount).toString());
@@ -66,6 +83,7 @@ export function InstallmentPlanView() {
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const selectedMethod = paymentMethods.find(m => m.id === paymentMethodId);
       const response = await fetch(`/api/installments/${selectedInstallment.id}/pay`, {
         method: 'POST',
         headers: { 
@@ -74,7 +92,9 @@ export function InstallmentPlanView() {
         },
         body: JSON.stringify({ 
           amount: Number(payAmount),
-          treasuryAccountId
+          treasuryAccountId,
+          paymentMethodId,
+          method: selectedMethod?.type || 'CASH'
         })
       });
 
@@ -94,6 +114,7 @@ export function InstallmentPlanView() {
     if (!window.confirm('هل أنت متأكد من إجراء تسوية مبكرة لكامل خطة الأقساط المتبقية؟')) return;
 
     try {
+      const selectedMethod = paymentMethods.find(m => m.id === paymentMethodId);
       const response = await fetch(`/api/installments/plans/${plan.id}/settle`, {
         method: 'POST',
         headers: { 
@@ -102,7 +123,9 @@ export function InstallmentPlanView() {
         },
         body: JSON.stringify({ 
           settlementAmount: Number(settlementAmount),
-          treasuryAccountId
+          treasuryAccountId,
+          paymentMethodId,
+          method: selectedMethod?.type || 'CASH'
         })
       });
 
@@ -225,7 +248,7 @@ export function InstallmentPlanView() {
             {plan.installments.map((inst: any) => {
               const isPaid = inst.status === 'PAID';
               const isPartial = inst.status === 'PARTIAL';
-              const isOverdue = new Date(inst.dueDate) < new Date() && !isPaid;
+              const isOverdue = inst.dueDate && new Date(inst.dueDate) < new Date() && !isPaid;
 
               return (
                 <div key={inst.id} className={`flex items-center justify-between p-4 rounded-xl border-l-4 ${
@@ -238,10 +261,14 @@ export function InstallmentPlanView() {
                       {inst.installmentNumber}
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">{new Date(inst.dueDate).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
+                      <p className="font-bold text-slate-900">
+                        {inst.dueDate 
+                          ? new Date(inst.dueDate).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+                          : 'دفعة بدون تاريخ (دفعة حرة)'}
+                      </p>
                       <div className="flex gap-2 text-sm mt-1">
                         <span className="font-mono text-slate-600 font-bold">قيمة القسط: {inst.amount.toLocaleString()} ج.م</span>
-                        {isPartial && <span className="text-orange-600 font-bold">(متبقي: {inst.amount - inst.paidAmount})</span>}
+                        {isPartial && <span className="text-orange-600 font-bold">(متبقي: {(inst.amount - inst.paidAmount).toLocaleString()} ج.م)</span>}
                       </div>
                     </div>
                   </div>
@@ -249,11 +276,17 @@ export function InstallmentPlanView() {
                   <div className="flex flex-col items-end gap-2">
                     {isPaid ? (
                       <span className="flex items-center gap-1 text-emerald-600 font-bold bg-white px-3 py-1 rounded-full shadow-sm text-sm">
-                        <CheckCircle2 size={16} /> مكتمل
+                        <CheckCircle2 size={16} /> مدفوع / مكتمل
                       </span>
                     ) : (
                       <>
-                        {isOverdue && <span className="flex items-center gap-1 text-rose-600 text-xs font-bold"><AlertCircle size={14} /> متأخر</span>}
+                        {isOverdue ? (
+                          <span className="flex items-center gap-1 text-rose-600 text-xs font-bold"><AlertCircle size={14} /> متأخر</span>
+                        ) : isPartial ? (
+                          <span className="flex items-center gap-1 text-blue-600 text-xs font-bold">مدفوع جزئياً</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-amber-600 text-xs font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">قيد الانتظار</span>
+                        )}
                         <button onClick={() => openPayModal(inst)} className={`flex items-center gap-1 ${plan.supplier ? 'bg-rose-600 hover:bg-rose-700' : 'bg-slate-900 hover:bg-slate-800'} text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors`}>
                           <Banknote size={16} /> {plan.supplier ? 'دفع للمورد' : 'تحصيل'}
                         </button>
@@ -297,6 +330,19 @@ export function InstallmentPlanView() {
                 <p className="text-xs text-slate-500 mt-1">يمكنك إدخال مبلغ أقل لتحصيل دفعات جزئية.</p>
               </div>
               
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة السداد</label>
+                <select
+                  value={paymentMethodId}
+                  onChange={e => setPaymentMethodId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 bg-white font-semibold text-slate-800"
+                >
+                  {paymentMethods.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">الخزينة / البنك</label>
                 <SearchableSelect
@@ -353,6 +399,19 @@ export function InstallmentPlanView() {
                 )}
               </div>
               
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">طريقة السداد</label>
+                <select
+                  value={paymentMethodId}
+                  onChange={e => setPaymentMethodId(e.target.value)}
+                  className="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-emerald-500/20 bg-white font-semibold text-slate-800"
+                >
+                  {paymentMethods.map(m => (
+                    <option key={m.id} value={m.id}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-2">الخزينة / البنك</label>
                 <SearchableSelect

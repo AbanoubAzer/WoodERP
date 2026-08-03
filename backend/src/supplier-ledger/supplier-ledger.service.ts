@@ -52,6 +52,7 @@ export class SupplierLedgerService {
 
     const transactions = await this.prisma.supplierTransaction.findMany({
       where: { supplierId },
+      include: { paymentMethod: true },
       orderBy: { date: 'asc' },
     });
 

@@ -90,33 +90,108 @@ export class InstallmentsService {
         },
       });
 
-      // Record Customer Payment
-      const payment = await prisma.customerPayment.create({
-        data: {
-          customerId: installment.plan.customerId!,
-          amount: payAmount,
-          method: data.method || 'CASH',
-          referenceId: `INST-${installment.installmentNumber}-${installment.plan.id.slice(0, 5)}`,
-        },
-      });
+      let invNum = '';
+      if (installment.plan.referenceInvoiceId) {
+        const salesInv = await prisma.salesInvoice.findUnique({
+          where: { id: installment.plan.referenceInvoiceId },
+          select: { invoiceNumber: true }
+        });
+        if (salesInv) {
+          invNum = salesInv.invoiceNumber;
+        } else {
+          const purchInv = await prisma.purchaseInvoice.findUnique({
+            where: { id: installment.plan.referenceInvoiceId },
+            select: { invoiceNumber: true }
+          });
+          if (purchInv) invNum = purchInv.invoiceNumber;
+        }
+      }
 
-      // Update Ledger (CREDIT reduces debt)
-      const lastTx = await prisma.customerTransaction.findFirst({
-        where: { customerId: installment.plan.customerId! },
-        orderBy: { date: 'desc' },
-      });
-      const currentBalance = lastTx ? lastTx.runningBalance : 0;
+      const reasonText = invNum 
+        ? `سداد قسط رقم #${installment.installmentNumber} (فاتورة رقم ${invNum})`
+        : `سداد قسط رقم #${installment.installmentNumber}`;
 
-      await prisma.customerTransaction.create({
-        data: {
-          customerId: installment.plan.customerId!,
-          type: 'CREDIT',
-          amount: payAmount,
-          runningBalance: currentBalance - payAmount,
-          referenceId: payment.id,
-          reason: `Payment for Installment #${installment.installmentNumber}`,
-        },
-      });
+      if (installment.plan.customerId) {
+        // Record Customer Payment
+        const payment = await prisma.customerPayment.create({
+          data: {
+            customerId: installment.plan.customerId,
+            amount: payAmount,
+            method: data.method || 'CASH',
+            paymentMethodId: data.paymentMethodId || null,
+            referenceId: `INST-${installment.installmentNumber}-${installment.plan.id.slice(0, 5)}`,
+          },
+        });
+
+        // Update Ledger (CREDIT reduces debt)
+        const lastTx = await prisma.customerTransaction.findFirst({
+          where: { customerId: installment.plan.customerId },
+          orderBy: { date: 'desc' },
+        });
+        const currentBalance = lastTx ? lastTx.runningBalance : 0;
+
+        await prisma.customerTransaction.create({
+          data: {
+            customerId: installment.plan.customerId,
+            type: 'CREDIT',
+            amount: payAmount,
+            runningBalance: currentBalance - payAmount,
+            referenceId: payment.id,
+            paymentMethodId: data.paymentMethodId || null,
+            reason: reasonText,
+          },
+        });
+
+        if (data.treasuryAccountId && payAmount > 0) {
+          await prisma.treasuryTransaction.create({
+            data: {
+              accountId: data.treasuryAccountId,
+              type: 'DEPOSIT',
+              amount: payAmount,
+              referenceId: `INST-${installment.installmentNumber}`,
+              description: reasonText,
+            },
+          });
+          await prisma.treasuryAccount.update({
+            where: { id: data.treasuryAccountId },
+            data: { balance: { increment: payAmount } },
+          });
+        }
+      } else if (installment.plan.supplierId) {
+        // Update Supplier Ledger (PAYMENT reduces debt)
+        const lastTx = await prisma.supplierTransaction.findFirst({
+          where: { supplierId: installment.plan.supplierId },
+          orderBy: { date: 'desc' },
+        });
+        const currentBalance = lastTx ? lastTx.runningBalance : 0;
+
+        await prisma.supplierTransaction.create({
+          data: {
+            supplierId: installment.plan.supplierId,
+            type: 'PAYMENT',
+            amount: payAmount,
+            runningBalance: currentBalance - payAmount,
+            paymentMethodId: data.paymentMethodId || null,
+            reason: reasonText,
+          },
+        });
+
+        if (data.treasuryAccountId && payAmount > 0) {
+          await prisma.treasuryTransaction.create({
+            data: {
+              accountId: data.treasuryAccountId,
+              type: 'WITHDRAWAL',
+              amount: payAmount,
+              referenceId: `INST-${installment.installmentNumber}`,
+              description: reasonText,
+            },
+          });
+          await prisma.treasuryAccount.update({
+            where: { id: data.treasuryAccountId },
+            data: { balance: { decrement: payAmount } },
+          });
+        }
+      }
 
       // Check if plan is completed
       const allInstallments = await prisma.installment.findMany({

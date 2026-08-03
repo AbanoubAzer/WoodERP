@@ -20,7 +20,7 @@ export function InstallmentsTracker({
          <div className="text-center text-slate-500 py-6 text-sm">لا توجد أقساط مستحقة قريباً</div>
       ) : (
         data.map((item, idx) => {
-          const isOverdue = new Date(item.dueDate) < new Date();
+          const isOverdue = item.dueDate && new Date(item.dueDate) < new Date();
           return (
             <Link 
               key={idx} 
@@ -33,7 +33,7 @@ export function InstallmentsTracker({
                 </p>
                 <p className={`text-xs mt-1 flex gap-2 items-center ${isOverdue ? 'text-rose-600 font-bold' : 'text-slate-500'}`}>
                   <span className={`inline-block w-2 h-2 rounded-full ${isOverdue ? 'bg-rose-500 animate-pulse' : (type === 'CUSTOMER' ? 'bg-emerald-500' : 'bg-orange-500')}`}></span>
-                  {isOverdue ? 'متأخر منذ:' : 'استحقاق:'} {new Date(item.dueDate).toLocaleDateString('ar-EG')}
+                  {item.dueDate ? `${isOverdue ? 'متأخر منذ:' : 'استحقاق:'} ${new Date(item.dueDate).toLocaleDateString('ar-EG')}` : 'دفعة بدون تاريخ'}
                 </p>
               </div>
               <span className={`font-black text-sm ${isOverdue ? 'text-rose-700' : 'text-slate-800'}`}>{item.amount.toLocaleString()} ج.م</span>

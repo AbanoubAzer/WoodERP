@@ -110,7 +110,7 @@ export class SalesService {
             variantId: item.variantId,
             quantity: item.quantity,
             fromWarehouseId: item.warehouseId,
-            reason: `Sales Invoice ${invoiceNumber}`,
+            reason: `فاتورة مبيعات رقم ${invoiceNumber}`,
           },
         });
       }
@@ -129,7 +129,8 @@ export class SalesService {
           amount: totalAmount,
           runningBalance: currentBalance + totalAmount,
           referenceId: invoice.id,
-          reason: `Sales Invoice ${invoiceNumber}`,
+          paymentMethodId: data.paymentMethodId || null,
+          reason: `فاتورة مبيعات رقم ${invoiceNumber}`,
         },
       });
 
@@ -283,6 +284,7 @@ export class SalesService {
         where,
         include: {
           customer: true,
+          paymentMethod: true,
           createdBy: { select: { id: true, name: true, email: true } },
         },
         orderBy: { issuedAt: 'desc' },

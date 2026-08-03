@@ -3,6 +3,8 @@ import { useAuthStore } from '../../../store/authStore';
 import { FileText, Download, Users, ArrowUpDown, Save, Search, Settings2, Trash2 } from 'lucide-react';
 import { TableSkeleton } from '../../../components/ui/Skeleton';
 import { toast } from '../../../store/toastStore';
+import { toArabicDigits } from '../../../utils/numberUtils';
+
 
 interface Customer {
   id: string;
@@ -13,6 +15,7 @@ interface Customer {
   address?: string;
   category: string;
   balance: number;
+  installmentType?: 'UNDATED' | 'DATED' | 'CREDIT';
 }
 
 export function ComprehensiveCustomerReport() {
@@ -22,7 +25,7 @@ export function ComprehensiveCustomerReport() {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Grouping
-  const [groupBy, setGroupBy] = useState<'NONE' | 'CITY' | 'CATEGORY' | 'BALANCE_STATUS'>('NONE');
+  const [groupBy, setGroupBy] = useState<'NONE' | 'CITY' | 'CATEGORY' | 'BALANCE_STATUS' | 'INSTALLMENT_TYPE'>('NONE');
   
   // Ordering Profiles
   const [profiles, setProfiles] = useState<{id?: string, name: string, order: string[]}[]>([]);
@@ -152,6 +155,10 @@ export function ComprehensiveCustomerReport() {
         if (c.balanceStatus === 'DEBIT') return 'عملاء مدينين (عليهم أموال)';
         if (c.balanceStatus === 'CREDIT') return 'عملاء دائنين (لهم أموال)';
         return 'رصيد صفري';
+      case 'INSTALLMENT_TYPE':
+        if (c.installmentType === 'UNDATED') return 'دفعات بدون تاريخ (مرنة)';
+        if (c.installmentType === 'DATED') return 'أقساط مجدولة بتاريخ';
+        return 'آجل عادي / بدون تقسيط';
       default: return 'ALL';
     }
   };
@@ -320,6 +327,7 @@ export function ComprehensiveCustomerReport() {
             <option value="CITY">المنطقة / المدينة</option>
             <option value="CATEGORY">تصنيف العميل</option>
             <option value="BALANCE_STATUS">الموقف المالي (مدين/دائن)</option>
+            <option value="INSTALLMENT_TYPE">طبيعة السداد (دفعات بدون تاريخ / أقساط)</option>
           </select>
         </div>
 
@@ -500,14 +508,26 @@ export function ComprehensiveCustomerReport() {
                               <div className="flex items-center gap-3">
                                 {/* Color Tag Indicator */}
                                 <div className={`w-3 h-3 rounded-full flex-shrink-0 print:hidden ${c.balanceStatus === 'DEBIT' ? 'bg-rose-500' : c.balanceStatus === 'CREDIT' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
-                                <div>
-                                  <p className="font-bold text-slate-900 print:text-black print:text-sm">{c.name}</p>
-                                  <p className="text-xs text-slate-500 font-mono mt-0.5 print:text-gray-700">{c.code}</p>
-                                </div>
+                                 <div>
+                                   <div className="flex items-center gap-2 flex-wrap">
+                                     <p className="font-bold text-slate-900 print:text-black print:text-sm">{c.name}</p>
+                                     {c.installmentType === 'UNDATED' && (
+                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 print:border-black print:text-black print:bg-gray-100">
+                                         دفعات بدون تاريخ
+                                       </span>
+                                     )}
+                                     {c.installmentType === 'DATED' && (
+                                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-sky-100 text-sky-800 border border-sky-200 print:border-black print:text-black print:bg-gray-100">
+                                         أقساط مجدولة
+                                       </span>
+                                     )}
+                                   </div>
+                                   <p className="text-xs text-slate-500 font-mono mt-0.5 print:text-gray-700">{toArabicDigits(c.code)}</p>
+                                 </div>
                               </div>
                             </td>
                             <td className="py-4 px-6 print:border print:border-gray-300 print:py-2">
-                              <p className="text-sm text-slate-700 print:text-black print:text-sm">{c.phone || 'غير متوفر'}</p>
+                              <p className="text-sm text-slate-700 print:text-black print:text-sm">{toArabicDigits(c.phone) || 'غير متوفر'}</p>
                               <p className="text-xs text-slate-500 mt-0.5 truncate max-w-[200px] print:text-gray-700 print:whitespace-normal" title={c.city ? `${c.city} - ${c.address || ''}` : ''}>
                                 {c.city || 'منطقة غير محددة'}
                               </p>
